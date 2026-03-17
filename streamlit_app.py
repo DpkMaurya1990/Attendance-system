@@ -123,6 +123,15 @@ st.title("🧑‍💼 AI Attendance System")
 # Sidebar menu
 menu = st.sidebar.radio("Menu", ["Add Employee", "Mark Attendance", "View Attendance"])
 
+# Reset modal when page changes
+if "last_menu" not in st.session_state:
+    st.session_state["last_menu"] = menu
+
+if st.session_state["last_menu"] != menu:
+    st.session_state["show_modal"] = False
+    st.session_state["last_menu"] = menu
+    
+
 # --- Global state for modal ---
 if "show_modal" not in st.session_state:
     st.session_state["show_modal"] = False
