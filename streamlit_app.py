@@ -110,8 +110,11 @@ def render_employee_modal(employees):
 # Backend API base URL
 API_URL = "http://127.0.0.1:8000"
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "employees.db")
+
 def get_db_connection():
-    return sqlite3.connect("employees.db", check_same_thread=False)
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 st.set_page_config(page_title="AI Attendance System", layout="centered")
 st.title("🧑‍💼 AI Attendance System")
