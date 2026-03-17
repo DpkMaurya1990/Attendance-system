@@ -147,12 +147,8 @@ def handle_see_emp():
 
         if not df.empty:
             st.session_state["employees"] = df.to_dict(orient="records")
-            st.session_state["show_modal"] = True
-
-            st.rerun()   # 🔥 FORCE REFRESH
-
         else:
-            st.info("No employees found.")
+            st.session_state["employees"] = []
 
     except Exception as e:
         st.error(f"Error fetching employees: {e}")
@@ -161,18 +157,10 @@ def handle_see_emp():
 def show_employee_modal():
     if st.session_state.get("show_modal", False):
         employees = st.session_state.get("employees", [])
-        render_employee_modal(employees)
 
-        # JS flag for closing
-        if "_js_events" not in st.session_state:
-            st.session_state["_js_events"] = ""
-
-        # Listen for JS flag
-        js_event = st.session_state.get("_js_events", "")
-        if js_event == "close_modal":
-            close_employee_modal()
-            st.session_state["_js_events"] = ""
-            st.rerun()
+        if employees:   # 🔥 IMPORTANT FIX
+            render_employee_modal(employees)
+           
 
 
 # ------------------- ADD EMPLOYEE PAGE -------------------
@@ -254,8 +242,10 @@ elif menu == "Mark Attendance":
     st.divider()
     if st.button("🧾 See_Emp", key="see_emp_mark"):
         handle_see_emp()
-    show_employee_modal()
-
+        st.session_state["show_modal"] = True   # 🔥 force open every time
+        
+        
+        
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
     st.subheader("📋 Attendance Records")
@@ -298,10 +288,10 @@ elif menu == "View Attendance":
     st.divider()
     if st.button("🧾 See_Emp", key="see_emp_view"):
         handle_see_emp()
-    show_employee_modal()
+        st.session_state["show_modal"] = True   # 🔥 force open every time
+               
     # Close the modal when JS sends the event
 if st.session_state.get("modal_closed", False):
     st.session_state["show_modal"] = False
     st.session_state["employees"] = []   # 🔥 reset data also
-    st.session_state["modal_closed"] = False
-    st.rerun()
+    st.session_state["modal_closed"] = False    
