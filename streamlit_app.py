@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
-from datetime import date
+from datetime import date, datetime
 import sqlite3
 import pandas as pd
 
@@ -229,11 +229,13 @@ elif menu == "Mark Attendance":
             conn = get_db_connection()
             cursor = conn.cursor()
 
+            current_time = datetime.now().strftime("%H:%M:%S")
+
             cursor.execute("""
                 INSERT INTO attendance 
-                (emp_id, status, marked_by, date)
-                VALUES (?, ?, ?, ?)
-            """, (emp_id, status, marked_by, str(date.today())))
+                (emp_id, status, marked_by, date, marked_time)
+                VALUES (?, ?, ?, ?, ?)
+            """, (emp_id, status, marked_by, str(date.today()), current_time))
 
             conn.commit()
             conn.close()
