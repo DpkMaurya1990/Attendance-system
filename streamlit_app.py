@@ -229,13 +229,13 @@ elif menu == "Mark Attendance":
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            current_time = datetime.now().strftime("%H:%M:%S")
+            current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             cursor.execute("""
                 INSERT INTO attendance 
                 (emp_id, status, marked_by, date, marked_time)
                 VALUES (?, ?, ?, ?, ?)
-            """, (emp_id, status, marked_by, str(date.today()), current_time))
+            """, (emp_id, status, marked_by, str(date.today()), current_timestamp))
 
             conn.commit()
             conn.close()
