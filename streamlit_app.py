@@ -200,6 +200,7 @@ elif menu == "Mark Attendance":
 
     emp_id = st.number_input("Employee ID", step=1)
     status = st.selectbox("Status", ["Present", "Absent"])
+    emp_name = ""
 
     # Auto-fetch employee name when emp_id is entered
     if emp_id > 0:
