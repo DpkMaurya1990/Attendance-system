@@ -9,9 +9,6 @@ import sqlite3
 import pandas as pd
 
 # ---------- CUSTOM MODAL HELPERS ----------
-def open_employee_modal():
-    st.session_state["show_modal"] = True
-
 def close_employee_modal():
     st.session_state["show_modal"] = False
 
@@ -291,11 +288,12 @@ elif menu == "View Attendance":
         handle_see_emp()
                
     # Close the modal when JS sends the event
-if st.session_state.get("modal_closed", False):
-    st.session_state["show_modal"] = False
-    st.session_state["employees"] = []   
-    st.session_state["modal_closed"] = False    
-    st.rerun()
-
 # --- ALWAYS render modal (important) ---
 show_employee_modal()
+
+# Close the modal when JS sends the event
+if st.session_state.get("modal_closed", False):
+    st.session_state["show_modal"] = False
+    st.session_state["employees"] = []
+    st.session_state["modal_closed"] = False
+    st.rerun()
