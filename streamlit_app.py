@@ -248,6 +248,7 @@ elif menu == "Mark Attendance":
         
         
         
+
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
     st.subheader("📋 Attendance Records")
@@ -262,32 +263,34 @@ elif menu == "View Attendance":
     except Exception as e:
         st.error(f"Error fetching attendance: {e}")
         records = []
-        if records:
-            st.dataframe(records)
 
-            from app.utils import save_attendance_to_csv, generate_summary, plot_summary_chart
-            import os
+    # ✅ OUTSIDE try/except (IMPORTANT)
+    if records:
+        st.dataframe(records)
 
-            # Generate and show summary
-            summary_df = generate_summary(records)
-            st.write("### Summary Report")
-            st.dataframe(summary_df)
+        from app.utils import save_attendance_to_csv, generate_summary, plot_summary_chart
+        import os
 
-            # Save to CSV
-            reports_dir = os.path.join(os.path.dirname(__file__), "..", "reports")
-            csv_path = save_attendance_to_csv(records, reports_dir)
-            chart_path = plot_summary_chart(summary_df, reports_dir)
+        summary_df = generate_summary(records)
+        st.write("### Summary Report")
+        st.dataframe(summary_df)
 
-            if csv_path:
-                with open(csv_path, "rb") as f:
-                    st.download_button("⬇️ Download CSV Report", f, file_name=os.path.basename(csv_path))
+        reports_dir = os.path.join(os.path.dirname(__file__), "..", "reports")
+        csv_path = save_attendance_to_csv(records, reports_dir)
+        chart_path = plot_summary_chart(summary_df, reports_dir)
 
-            if chart_path and os.path.exists(chart_path):
-                st.image(chart_path, caption="Attendance Summary Chart")
-        else:
-            st.info("No attendance records found.")
+        if csv_path:
+            with open(csv_path, "rb") as f:
+                st.download_button("⬇️ Download CSV Report", f, file_name=os.path.basename(csv_path))
+
+        if chart_path and os.path.exists(chart_path):
+            st.image(chart_path, caption="Attendance Summary Chart")
+
+    else:
+        st.info("No attendance records found.")
 
     st.divider()
+
     if st.button("🧾 See_Emp", key="see_emp_view"):
         handle_see_emp()
                
