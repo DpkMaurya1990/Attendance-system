@@ -115,7 +115,7 @@ def render_employee_modal(employees):
 API_URL = "http://127.0.0.1:8000"
 
 def get_db_connection():
-    return sqlite3.connect("data/employees.db", check_same_thread=False)
+    return sqlite3.connect("employees.db", check_same_thread=False)
 
 st.set_page_config(page_title="AI Attendance System", layout="centered")
 st.title("🧑‍💼 AI Attendance System")
