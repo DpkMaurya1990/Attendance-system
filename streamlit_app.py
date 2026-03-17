@@ -80,7 +80,7 @@ def render_employee_modal(employees):
     <body>
     <div class="modal-overlay" id="employee-modal">
       <div class="modal-content">
-        <button class="modal-close" onclick="closeModal()">✖</button>
+        <button class="modal-close" onclick="document.getElementById('employee-modal').remove()">✖</button>
         <h3>📋 Employee List</h3>
         <p>List of Employees (Emp_ID | Name | Manual_ID)</p>
         {table_html}
@@ -94,8 +94,7 @@ def render_employee_modal(employees):
             modal.remove();
         }}
         // Notify Streamlit backend to update state
-        const streamlitMsg = {{type: "streamlit:setComponentValue", key: "modal_closed", value: true}};
-        window.parent.postMessage(streamlitMsg, "*");
+        
     }}
     </script>
     </body>
@@ -158,6 +157,11 @@ def show_employee_modal():
         employees = st.session_state.get("employees", [])
 
         if employees:
+            if st.button("❌ Close Employee List", key="close_modal_btn"):
+                st.session_state["show_modal"] = False
+                st.session_state["employees"] = []
+                st.rerun()
+
             render_employee_modal(employees)
            
 
@@ -291,9 +295,3 @@ elif menu == "View Attendance":
 # --- ALWAYS render modal (important) ---
 show_employee_modal()
 
-# Close the modal when JS sends the event
-if st.session_state.get("modal_closed", False):
-    st.session_state["show_modal"] = False
-    st.session_state["employees"] = []
-    st.session_state["modal_closed"] = False
-    st.rerun()
