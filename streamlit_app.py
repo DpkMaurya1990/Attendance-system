@@ -273,9 +273,17 @@ elif menu == "View Attendance":
         ORDER BY marked_time DESC
         """
         df = pd.read_sql_query(query, conn)
+        df.rename(columns={
+            "emp_id": "Employee ID",
+            "marked_time": "Timestamp",
+            "status": "Status",
+            "marked_by": "EName"
+        }, inplace=True)
         conn.close()
 
         records = df.to_dict(orient="records")
+        
+       
 
     except Exception as e:
         st.error(f"Error fetching attendance: {e}")
