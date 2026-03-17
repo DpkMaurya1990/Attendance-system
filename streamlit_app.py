@@ -7,7 +7,7 @@ import streamlit as st
 from datetime import date
 import sqlite3
 import pandas as pd
-from utils import generate_summary, save_attendance_to_csv, plot_summary_chart
+
 
 # ---------- CUSTOM MODAL HELPERS ----------
 def close_employee_modal():
@@ -265,33 +265,41 @@ elif menu == "View Attendance":
         st.error(f"Error fetching attendance: {e}")
         records = []
 
+    
+    if not records:
+        st.session_state.pop("csv_path", None)
+
     # ✅ OUTSIDE try/except (IMPORTANT)
     if records:
         st.dataframe(records)
 
-        from app.utils import save_attendance_to_csv, generate_summary, plot_summary_chart
-        import os
+        from utils import generate_summary, save_attendance_to_csv, plot_summary_chart
 
+        # 📊 Summary
         summary_df = generate_summary(records)
-        st.write("### Summary Report")
+        st.write("### 📊 Summary Report")
         st.dataframe(summary_df)
 
-        reports_dir = os.path.join(os.path.dirname(__file__), "..", "reports")
-        csv_path = save_attendance_to_csv(records, reports_dir)
-        chart_path = plot_summary_chart(summary_df, reports_dir)
+        
+        # 📥 CSV Download (optimized)
+        if "csv_path" not in st.session_state:
+            st.session_state["csv_path"] = save_attendance_to_csv(records)
 
-        if csv_path:
-            with open(csv_path, "rb") as f:
-                st.download_button("⬇️ Download CSV Report", f, file_name=os.path.basename(csv_path))
+        with open(st.session_state["csv_path"], "rb") as f:
+            st.download_button("⬇️ Download CSV Report", f, file_name="attendance_report.csv")
 
-        if chart_path and os.path.exists(chart_path):
-            st.image(chart_path, caption="Attendance Summary Chart")
+        # 📈 Chart
+        if "chart_generated" not in st.session_state:
+            chart_path = plot_summary_chart(summary_df)
+            st.session_state["chart_path"] = chart_path
+            st.session_state["chart_generated"] = True
+
+        st.image(st.session_state["chart_path"])
 
     else:
         st.info("No attendance records found.")
 
     st.divider()
-
     if st.button("🧾 See_Emp", key="see_emp_view"):
         handle_see_emp()
                

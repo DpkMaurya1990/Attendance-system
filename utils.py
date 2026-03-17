@@ -19,13 +19,13 @@ def save_attendance_to_csv(records):
 def plot_summary_chart(summary_df):
     file_path = "attendance_chart.png"
 
-    plt.figure()
+    plt.figure(figsize=(4,3))   # smaller chart
     plt.bar(summary_df["status"], summary_df["count"])
     plt.xlabel("Status")
     plt.ylabel("Count")
     plt.title("Attendance Summary")
 
     plt.savefig(file_path)
-    plt.close()
+    plt.close('all')
 
     return file_path
