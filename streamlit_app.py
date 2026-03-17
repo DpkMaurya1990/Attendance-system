@@ -193,10 +193,6 @@ if menu == "Add Employee":
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
 
-            st.divider()
-            if st.button("🧾 See_Emp"):
-                handle_see_emp()
-            show_employee_modal()
 
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
@@ -241,6 +237,11 @@ elif menu == "Mark Attendance":
 
         except Exception as e:
             st.error(f"Error marking attendance: {e}")
+
+    st.divider()
+    if st.button("🧾 See_Emp"):
+        handle_see_emp()
+    show_employee_modal()
 
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
