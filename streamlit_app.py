@@ -7,6 +7,7 @@ import streamlit as st
 from datetime import date
 import sqlite3
 import pandas as pd
+from utils import generate_summary, save_attendance_to_csv, plot_summary_chart
 
 # ---------- CUSTOM MODAL HELPERS ----------
 def close_employee_modal():
