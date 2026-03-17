@@ -149,7 +149,7 @@ def handle_see_emp():
             st.session_state["employees"] = df.to_dict(orient="records")
             st.session_state["show_modal"] = True
 
-            st.experimental_rerun()   # 🔥 FORCE REFRESH
+            st.rerun()   # 🔥 FORCE REFRESH
 
         else:
             st.info("No employees found.")
@@ -172,7 +172,7 @@ def show_employee_modal():
         if js_event == "close_modal":
             close_employee_modal()
             st.session_state["_js_events"] = ""
-            st.experimental_rerun()
+            st.rerun()
 
 
 # ------------------- ADD EMPLOYEE PAGE -------------------
@@ -304,4 +304,4 @@ if st.session_state.get("modal_closed", False):
     st.session_state["show_modal"] = False
     st.session_state["employees"] = []   # 🔥 reset data also
     st.session_state["modal_closed"] = False
-    st.experimental_rerun()
+    st.rerun()
