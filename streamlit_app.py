@@ -147,8 +147,11 @@ def handle_see_emp():
 
         if not df.empty:
             st.session_state["employees"] = df.to_dict(orient="records")
+            st.session_state["show_modal"] = True
+            st.rerun()   # ✅ IMPORTANT
+
         else:
-            st.session_state["employees"] = []
+            st.info("No employees found.")
 
     except Exception as e:
         st.error(f"Error fetching employees: {e}")
@@ -158,7 +161,7 @@ def show_employee_modal():
     if st.session_state.get("show_modal", False):
         employees = st.session_state.get("employees", [])
 
-        if employees:   # 🔥 IMPORTANT FIX
+        if employees:
             render_employee_modal(employees)
            
 
@@ -242,7 +245,6 @@ elif menu == "Mark Attendance":
     st.divider()
     if st.button("🧾 See_Emp", key="see_emp_mark"):
         handle_see_emp()
-        st.session_state["show_modal"] = True   # 🔥 force open every time
         
         
         
@@ -293,5 +295,6 @@ elif menu == "View Attendance":
     # Close the modal when JS sends the event
 if st.session_state.get("modal_closed", False):
     st.session_state["show_modal"] = False
-    st.session_state["employees"] = []   # 🔥 reset data also
+    st.session_state["employees"] = []   
     st.session_state["modal_closed"] = False    
+    st.rerun()
