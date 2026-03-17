@@ -4,7 +4,6 @@ import streamlit.components.v1 as components
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
-import requests
 from datetime import date
 import sqlite3
 import pandas as pd
@@ -290,7 +289,6 @@ elif menu == "View Attendance":
     st.divider()
     if st.button("🧾 See_Emp", key="see_emp_view"):
         handle_see_emp()
-        st.session_state["show_modal"] = True   # 🔥 force open every time
                
     # Close the modal when JS sends the event
 if st.session_state.get("modal_closed", False):
@@ -298,3 +296,6 @@ if st.session_state.get("modal_closed", False):
     st.session_state["employees"] = []   
     st.session_state["modal_closed"] = False    
     st.rerun()
+
+# --- ALWAYS render modal (important) ---
+show_employee_modal()
