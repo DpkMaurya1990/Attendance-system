@@ -256,9 +256,23 @@ elif menu == "Mark Attendance":
 elif menu == "View Attendance":
     st.subheader("📋 Attendance Records")
 
+    
+    today = date.today()
+    default_start = today.replace(day=1)
+    default_end = today
+
+    start_date = st.date_input("Start Date", default_start)
+    end_date = st.date_input("End Date", default_end)
+    
+    
     try:
         conn = get_db_connection()
-        df = pd.read_sql_query("SELECT * FROM attendance", conn)
+        query = f"""
+        SELECT * FROM attendance
+        WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY marked_time DESC
+        """
+        df = pd.read_sql_query(query, conn)
         conn.close()
 
         records = df.to_dict(orient="records")
@@ -275,7 +289,7 @@ elif menu == "View Attendance":
     if records:
         st.dataframe(records)
 
-        from utils import generate_summary, save_attendance_to_csv, plot_summary_chart
+        from utils import generate_summary, plot_summary_chart
 
         # 📊 Summary
         summary_df = generate_summary(records)
@@ -283,12 +297,15 @@ elif menu == "View Attendance":
         st.dataframe(summary_df)
 
         
-        # 📥 CSV Download (optimized)
-        if "csv_path" not in st.session_state:
-            st.session_state["csv_path"] = save_attendance_to_csv(records)
+        # 📥 CSV Download (filtered data)
+        csv = df.to_csv(index=False).encode('utf-8')
 
-        with open(st.session_state["csv_path"], "rb") as f:
-            st.download_button("⬇️ Download CSV Report", f, file_name="attendance_report.csv")
+        st.download_button(
+            "⬇️ Download CSV Report",
+            csv,
+            file_name="attendance_report.csv",
+            mime="text/csv"
+        )
 
         # 📈 Chart
         if "chart_generated" not in st.session_state:
