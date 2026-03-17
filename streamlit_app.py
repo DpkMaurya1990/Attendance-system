@@ -249,7 +249,8 @@ elif menu == "Mark Attendance":
             st.error(f"Error marking attendance: {e}")
 
     st.divider()
-    if st.button("🧾 See_Emp"):
+    if st.button("🧾 See_Emp", key="see_emp_mark"):
+        st.session_state["show_modal"] = False
         handle_see_emp()
     show_employee_modal()
 
@@ -293,11 +294,13 @@ elif menu == "View Attendance":
             st.info("No attendance records found.")
 
     st.divider()
-    if st.button("🧾 See_Emp"):
+    if st.button("🧾 See_Emp", key="see_emp_view"):
+        st.session_state["show_modal"] = False
         handle_see_emp()
     show_employee_modal()
     # Close the modal when JS sends the event
 if st.session_state.get("modal_closed", False):
     st.session_state["show_modal"] = False
+    st.session_state["employees"] = []   # 🔥 reset data also
     st.session_state["modal_closed"] = False
     st.experimental_rerun()
