@@ -222,33 +222,30 @@ if menu == "Add Employee":
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
     st.subheader("🕒 Mark Attendance")
+    
+    # ✅ Fetch employees for dropdown
+    conn = get_db_connection()
+    df_emp = pd.read_sql("SELECT id, name FROM employees", conn)
+    conn.close()
 
-    emp_id = st.number_input("Employee ID", step=1)
-    status = st.selectbox("Status", ["Present", "Absent"])
-    emp_name = ""
+    emp_options = {
+        f"{row['name']} (ID: {row['id']})": row['id']
+        for _, row in df_emp.iterrows()
+    }
+    # ✅ Dropdown
+    
+    selected_emp = st.selectbox("Select Employee", list(emp_options.keys()))
+    emp_id = emp_options[selected_emp]
+    emp_name = selected_emp.split(" (ID")[0]
 
-    # Auto-fetch employee name when emp_id is entered
-    if emp_id > 0:
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT name FROM employees WHERE id=%s", (int(emp_id),))
-            result = cursor.fetchone()
-            conn.close()
-
-            if result:
-                emp_name = result[0]
-
-        except Exception:
-            pass
         
-        # ✅ Check if employee ID exists
+    # ✅ Check if employee ID exists
     if emp_id > 0 and not emp_name:
         st.error("Employee not found!")
         
     is_valid_employee = emp_id > 0 and emp_name != ""    
 
+    #Replace Emp_Name field with a disabled text input showing the name of the selected employee
     st.text_input("Emp_Name", value=emp_name, disabled=True)
     marked_by = emp_name
 
