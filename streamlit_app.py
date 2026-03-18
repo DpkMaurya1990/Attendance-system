@@ -82,7 +82,7 @@ def render_employee_modal(employees):
     </head>
     <body>
     <div class="modal-overlay" id="employee-modal">
-      <div class="modal-content" id="draggable-modal">
+      <div class="modal-content">
         <button class="modal-close" onclick="document.getElementById('employee-modal').remove()">✖</button>
         <h3>📋 Employee List</h3>
         <p>List of Employees (Emp_ID | Name | Manual_ID)</p>
@@ -98,29 +98,6 @@ def render_employee_modal(employees):
         }}
     }}
     
-    // ✅ DRAGGABLE SCRIPT (ADD BELOW)    
-    const modal = document.getElementById("draggable-modal");
-
-    let isDragging = false;
-    let offsetX, offsetY;
-
-    modal.addEventListener("mousedown", function(e) {{
-        isDragging = true;
-        offsetX = e.clientX - modal.offsetLeft;
-        offsetY = e.clientY - modal.offsetTop;
-    }});
-
-    document.addEventListener("mousemove", function(e) {{
-        if (isDragging) {{
-            modal.style.position = "absolute";
-            modal.style.left = (e.clientX - offsetX) + "px";
-            modal.style.top = (e.clientY - offsetY) + "px";
-        }}
-    }});
-
-    document.addEventListener("mouseup", function() {{
-        isDragging = false;
-    }});
     // Notify Streamlit backend to update state
     
     </script>
