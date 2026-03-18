@@ -243,7 +243,7 @@ elif menu == "Mark Attendance":
         except Exception:
             pass
 
-    marked_by = st.text_input("Marked By (your name)", value=emp_name)
+    marked_by = st.text_input("Emp_Name", value=emp_name)
 
     if st.button("Mark Attendance", key="mark_attendance_btn"):
         try:
