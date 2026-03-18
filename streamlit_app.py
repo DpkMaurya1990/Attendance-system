@@ -187,6 +187,11 @@ if menu == "Add Employee":
     manual_id = st.text_input("Manual ID (unique, alphanumeric)")
 
     if st.button("Add Employee", key="add_employee_btn_main"):
+        # ✅ Validation
+        if not name or not department or not designation or not doj or not manual_id:
+            st.warning("Please fill all fields (except Shift timings).")
+
+        else:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
