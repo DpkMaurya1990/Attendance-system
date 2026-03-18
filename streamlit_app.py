@@ -178,13 +178,26 @@ def show_employee_modal():
 # ------------------- ADD EMPLOYEE PAGE -------------------
 if menu == "Add Employee":
     st.subheader("➕ Add New Employee")
-    name = st.text_input("Name")
-    department = st.text_input("Department")
-    designation = st.text_input("Designation")
-    doj = st.date_input("Date of Joining")
-    shift_start = st.text_input("Shift Start (HH:MM)", "09:00")
-    shift_end = st.text_input("Shift End (HH:MM)", "18:00")
-    manual_id = st.text_input("Manual ID (unique, alphanumeric)")
+    st.markdown("Fields marked with * are required")
+    # Name
+    st.markdown("Name <span style='color:red'>*</span>", unsafe_allow_html=True)
+    name = st.text_input("", key="name")
+
+    # Department
+    st.markdown("Department <span style='color:red'>*</span>", unsafe_allow_html=True)
+    department = st.text_input("", key="department")
+
+    # Designation
+    st.markdown("Designation <span style='color:red'>*</span>", unsafe_allow_html=True)
+    designation = st.text_input("", key="designation")
+
+    # Date of Joining
+    st.markdown("Date of Joining <span style='color:red'>*</span>", unsafe_allow_html=True)
+    doj = st.date_input("", key="doj")
+
+    # Manual ID
+    st.markdown("Manual ID <span style='color:red'>*</span>", unsafe_allow_html=True)
+    manual_id = st.text_input("", key="manual_id")
 
     if st.button("Add Employee", key="add_employee_btn_main"):
         # ✅ Validation
