@@ -91,12 +91,12 @@ def render_employee_modal(employees):
     </div>
 
     <script>
-    function closeModal() {
+    function closeModal() {{
         const modal = document.getElementById("employee-modal");
-        if (modal) {
+        if (modal) {{
             modal.remove();
-        }
-    }
+        }}
+    }}
     
     // ✅ DRAGGABLE SCRIPT (ADD BELOW)    
     const modal = document.getElementById("draggable-modal");
@@ -104,23 +104,23 @@ def render_employee_modal(employees):
     let isDragging = false;
     let offsetX, offsetY;
 
-    modal.addEventListener("mousedown", function(e) {
+    modal.addEventListener("mousedown", function(e) {{
         isDragging = true;
         offsetX = e.clientX - modal.offsetLeft;
         offsetY = e.clientY - modal.offsetTop;
-    });
+    }});
 
-    document.addEventListener("mousemove", function(e) {
-        if (isDragging) {
+    document.addEventListener("mousemove", function(e) {{
+        if (isDragging) {{
             modal.style.position = "absolute";
             modal.style.left = (e.clientX - offsetX) + "px";
             modal.style.top = (e.clientY - offsetY) + "px";
-        }
-    });
+        }}
+    }});
 
-    document.addEventListener("mouseup", function() {
+    document.addEventListener("mouseup", function() {{
         isDragging = false;
-    });
+    }});
     // Notify Streamlit backend to update state
     
     </script>
