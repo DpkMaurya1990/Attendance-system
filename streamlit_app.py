@@ -194,10 +194,18 @@ if menu == "Add Employee":
     # Date of Joining
     st.markdown("Date of Joining <span style='color:red'>*</span>", unsafe_allow_html=True)
     doj = st.date_input("", key="doj")
-
+    
     # Manual ID
     st.markdown("Manual ID <span style='color:red'>*</span>", unsafe_allow_html=True)
     manual_id = st.text_input("", key="manual_id")
+    
+    # Shift Start (optional)
+    st.markdown("Shift Start")
+    shift_start = st.text_input("", value="09:00", key="shift_start")
+
+    # Shift End (optional)
+    st.markdown("Shift End")
+    shift_end = st.text_input("", value="18:00", key="shift_end")
 
     if st.button("Add Employee", key="add_employee_btn_main"):
         # ✅ Validation
