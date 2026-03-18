@@ -194,7 +194,7 @@ if menu == "Add Employee":
                 cursor.execute("""
                     INSERT INTO employees 
                     (name, department, designation, doj, shift_start, shift_end, manual_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (name, department, designation, str(doj), shift_start, shift_end, manual_id))
 
                 conn.commit()
@@ -242,7 +242,7 @@ elif menu == "Mark Attendance":
             cursor.execute("""
                 INSERT INTO attendance 
                 (emp_id, status, marked_by, date, marked_time)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             """, (emp_id, status, marked_by, str(date.today()), current_timestamp))
 
             conn.commit()
