@@ -233,7 +233,7 @@ elif menu == "Mark Attendance":
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            cursor.execute("SELECT name FROM employees WHERE id=?", (int(emp_id),))
+            cursor.execute("SELECT name FROM employees WHERE id=%s", (int(emp_id),))
             result = cursor.fetchone()
             conn.close()
 
@@ -243,7 +243,8 @@ elif menu == "Mark Attendance":
         except Exception:
             pass
 
-    marked_by = st.text_input("Emp_Name", value=emp_name)
+    st.text_input("Emp_Name", value=emp_name, disabled=True)
+    marked_by = emp_name
 
     if st.button("Mark Attendance", key="mark_attendance_btn"):
         try:
