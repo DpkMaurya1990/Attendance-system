@@ -114,11 +114,11 @@ API_URL = "http://127.0.0.1:8000"
 
 def get_db_connection():
     return psycopg2.connect(
-        host="db.rejmmghqbhtgmeedlmea.supabase.co",
+        host="aws-1-ap-northeast-1.pooler.supabase.com",
         database="postgres",
-        user="postgres",
+        user="postgres.rejmmghqbhtgmeedlmea",
         password="Alliswell@0605",
-        port="5432"
+        port="6543"
     )
 
 st.set_page_config(page_title="AI Attendance System", layout="centered")
