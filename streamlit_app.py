@@ -247,7 +247,7 @@ elif menu == "Mark Attendance":
     if emp_id > 0 and not emp_name:
         st.error("Employee not found!")
         
-        is_valid_employee = emp_id > 0 and emp_name != ""    
+    is_valid_employee = emp_id > 0 and emp_name != ""    
 
     st.text_input("Emp_Name", value=emp_name, disabled=True)
     marked_by = emp_name
