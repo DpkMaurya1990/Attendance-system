@@ -10,6 +10,7 @@ import pandas as pd
 import psycopg2
 
 
+
 # ---------- CUSTOM MODAL HELPERS ----------
 def close_employee_modal():
     st.session_state["show_modal"] = False
@@ -260,7 +261,7 @@ elif menu == "Mark Attendance":
 
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
-    st.subheader("📋 Attend Records")
+    st.subheader("📋 Attendance Records 🚀")
 
     
     today = date.today()
