@@ -190,11 +190,18 @@ if menu == "Add Employee":
         # ✅ Validation
         if not name or not department or not designation or not doj or not manual_id:
             st.warning("Please fill all fields (except Shift timings).")
-
+            
         else:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
+                
+            # ✅ Duplicate check
+                cursor.execute("SELECT 1 FROM employees WHERE manual_id = %s", (manual_id,))
+                existing = cursor.fetchone()
+
+                if existing:
+                    st.error("Manual ID already exists. Please use a unique ID.")
 
                 cursor.execute("""
                     INSERT INTO employees 
@@ -203,9 +210,10 @@ if menu == "Add Employee":
                 """, (name, department, designation, str(doj), shift_start, shift_end, manual_id))
 
                 conn.commit()
+                st.success("Employee added successfully!")
                 conn.close()
 
-                st.success("Employee added successfully!")
+                
 
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
