@@ -262,7 +262,7 @@ elif menu == "Mark Attendance":
 
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
-    st.subheader("📋 Attendance Records 🚀")
+    st.subheader("📋 Attendance Records")
 
     
     today = date.today()
