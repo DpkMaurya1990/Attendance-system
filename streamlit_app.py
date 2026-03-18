@@ -243,14 +243,16 @@ elif menu == "Mark Attendance":
         except Exception:
             pass
         
-        # ✅ Add here
+        # ✅ Check if employee ID exists
     if emp_id > 0 and not emp_name:
         st.error("Employee not found!")
+        
+        is_valid_employee = emp_id > 0 and emp_name != ""    
 
     st.text_input("Emp_Name", value=emp_name, disabled=True)
     marked_by = emp_name
 
-    if st.button("Mark Attendance", key="mark_attendance_btn"):
+    if st.button("Mark Attendance", key="mark_attendance_btn", disabled=not is_valid_employee):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
