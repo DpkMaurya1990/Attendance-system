@@ -1,0 +1,15 @@
+name,department,designation,doj,shift_start,shift_end,manual_id
+Gurpreet_Singh_Padam,IT,Team_Lead,1/1/2025,00:00.0,00:00.0,GE_1
+Deepak,IT,Sr. Dev,1/2/2025,00:00.0,00:00.0,GE_2
+Amit,HR,HR Head,1/3/2025,00:00.0,00:00.0,GE_3
+Devendra,Admin,Admin head,11/1/2025,00:00.0,00:00.0,GE_4
+Devendra_Gupta,Admin,Sr. Admin,11/1/2025,00:00.0,00:00.0,GE_5
+Deepak1,MLOps,Sr. Dev,12/27/2025,00:00.0,00:00.0,GE_6
+Deepak2,Legal,Sr. Advisor,12/28/2025,00:00.0,00:00.0,GE_7
+Gurpreet2,Networking & Hardware,Team Head,12/28/2025,9:00,18:00,GE_8
+Amit2,IT,IT Head,12/28/2025,9:00,18:00,GE_9
+Radha,HR,Jr. HR,3/17/2026,9:00,18:00,GE_10
+Nitya,Legal,Corporate Matter,3/17/2026,9:00,18:00,GE_11
+Param,Paath,Paath_karta,3/17/2026,9:00,18:00,GE_12
+Amrita,Backend,CRM Manager,3/17/2026,9:00,18:00,GE_13
+Hridesh,Loan,Field Boy,3/17/2026,9:00,18:00,GE_14

@@ -7,6 +7,7 @@ import streamlit as st
 from datetime import date, datetime
 import sqlite3
 import pandas as pd
+import psycopg2
 
 
 # ---------- CUSTOM MODAL HELPERS ----------
@@ -113,8 +114,10 @@ API_URL = "http://127.0.0.1:8000"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "employees.db")
 
+DB_URL = "postgresql://postgres:Alliswell@0605@db.rejmmghqbhtgmeedlmea.supabase.co:5432/postgres"
+
 def get_db_connection():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+    return psycopg2.connect(DB_URL)
 
 st.set_page_config(page_title="AI Attendance System", layout="centered")
 st.title("🧑‍💼 AI Attendance System")
@@ -257,7 +260,7 @@ elif menu == "Mark Attendance":
 
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
-    st.subheader("📋 Attendance Records")
+    st.subheader("📋 Attend Records")
 
     
     today = date.today()
@@ -275,11 +278,11 @@ elif menu == "View Attendance":
         WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY marked_time DESC
         """
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql(query, conn)
         df.rename(columns={
             "emp_id": "Employee ID",
             "marked_time": "Timestamp",
-            "EName": "Emp_Name"
+            "marked_by": "EName"
         }, inplace=True)
         conn.close()
 
