@@ -348,9 +348,10 @@ elif menu == "View Attendance":
     try:
         conn = get_db_connection()
         query = f"""
-        SELECT * FROM attendance ORDER BY marked_time DESC LIMIT 500
+        SELECT * FROM attendance
         WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY marked_time DESC
+        LIMIT 500
         """
         df = pd.read_sql(query, conn)
         df.rename(columns={
