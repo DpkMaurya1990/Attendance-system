@@ -400,7 +400,7 @@ elif menu == "View Attendance":
             "emp_id": "Employee ID",
             "marked_time": "Timestamp",
             "marked_by": "EName",
-            "status": "Status"
+            "status": "status"
         }, inplace=True)
         conn.close()
 
