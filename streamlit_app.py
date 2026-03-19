@@ -399,7 +399,8 @@ elif menu == "View Attendance":
         df.rename(columns={
             "emp_id": "Employee ID",
             "marked_time": "Timestamp",
-            "marked_by": "EName"
+            "marked_by": "EName",
+            "status": "Status"
         }, inplace=True)
         conn.close()
 
