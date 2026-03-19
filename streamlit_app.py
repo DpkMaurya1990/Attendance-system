@@ -424,13 +424,12 @@ elif menu == "View Attendance":
         st.subheader("🗑️ Delete Attendance Record")
 
         df_display = pd.DataFrame(records)
-        st.write(df_display.columns)
 
         if not df_display.empty:
-            # Create readable options
+
             record_options = {
-            f"{row.get('EName', '')} | {row.get('status', row.get('Status', ''))} | {row.get('Timestamp', '')}": row.get("id")
-            for _, row in df_display.iterrows()
+                f"{row.get('EName', '')} | {row.get('Status', row.get('status', ''))} | {row.get('Timestamp', '')}": row["id"]
+                for _, row in df_display.iterrows()
             }
 
             selected_record = st.selectbox(
@@ -438,7 +437,9 @@ elif menu == "View Attendance":
                 list(record_options.keys())
             )
 
-            if st.button("Delete Attendance", key="delete_att_btn"):
+            confirm_delete = st.checkbox("Confirm delete", key="confirm_att_delete")
+
+            if st.button("Delete Attendance", key="delete_att_btn", disabled=not confirm_delete):
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
@@ -449,7 +450,14 @@ elif menu == "View Attendance":
                     conn.commit()
                     conn.close()
 
+                    # ✅ Show message FIRST
                     st.success("Attendance deleted successfully!")
+
+                    # ✅ Small delay (important)
+                    import time
+                    time.sleep(1)
+
+                    # ✅ Then refresh
                     st.rerun()
 
                 except Exception as e:
