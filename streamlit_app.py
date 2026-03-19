@@ -186,7 +186,11 @@ if menu == "Add Employee":
 
     # Department
     st.markdown("Department <span style='color:red'>*</span>", unsafe_allow_html=True)
-    department = st.text_input("", key="department")
+    department = st.selectbox(
+        "",
+        ["Initiated Gents", "Initiated Ladies", "Gents", "Ladies", "Children", "Santsu"],
+        key="department"
+    )
 
     # Designation
     st.markdown("Designation <span style='color:red'>*</span>", unsafe_allow_html=True)
