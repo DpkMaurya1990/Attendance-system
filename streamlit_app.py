@@ -264,10 +264,10 @@ if menu == "Add Employee":
                 """, (name, department, designation, str(doj), shift_start, shift_end, manual_id))
 
                 conn.commit()
-                st.success("Employee added successfully!")
                 conn.close()
-
-                
+                st.success("Employee added successfully!")
+                # ✅ refresh cache
+                st.cache_data.clear()
 
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
