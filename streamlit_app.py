@@ -424,12 +424,13 @@ elif menu == "View Attendance":
         st.subheader("🗑️ Delete Attendance Record")
 
         df_display = pd.DataFrame(records)
+        st.write(df_display.columns)
 
         if not df_display.empty:
             # Create readable options
             record_options = {
-                f"{row['EName']} | {row['status']} | {row['Timestamp']}": row["id"]
-                for _, row in df_display.iterrows()
+            f"{row.get('EName', '')} | {row.get('status', row.get('Status', ''))} | {row.get('Timestamp', '')}": row.get("id")
+            for _, row in df_display.iterrows()
             }
 
             selected_record = st.selectbox(
