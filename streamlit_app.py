@@ -428,7 +428,7 @@ elif menu == "View Attendance":
         if not df_display.empty:
             # Create readable options
             record_options = {
-                f"{row['EName']} | {row['Status']} | {row['Timestamp']}": row["id"]
+                f"{row['EName']} | {row['status']} | {row['Timestamp']}": row["id"]
                 for _, row in df_display.iterrows()
             }
 
