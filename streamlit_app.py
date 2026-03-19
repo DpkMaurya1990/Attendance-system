@@ -188,13 +188,35 @@ if menu == "Add Employee":
     st.markdown("Department <span style='color:red'>*</span>", unsafe_allow_html=True)
     department = st.selectbox(
         "",
-        ["Initiated Gents", "Initiated Ladies", "Gents", "Ladies", "Children", "Santsu"],
+        ["Initiated Gents", "Initiated Ladies", "Gents", "Ladies", "Children", "Santsu", "Other"],
         key="department"
     )
+    
+    if department == "Other":
+        department = st.text_input("Enter Department", key="department_other")
 
     # Designation
     st.markdown("Designation <span style='color:red'>*</span>", unsafe_allow_html=True)
-    designation = st.text_input("", key="designation")
+    designation = st.selectbox(
+    "",
+    [
+        "IT",
+        "Branch Sec",
+        "Ass Branch Sec",
+        "Youth Sec",
+        "Youth Teas",
+        "Mahila 1",
+        "Mahila 2",
+        "Mahila 3",
+        "Office Bearer",
+        "Other"
+    ],
+    key="designation"
+    )
+    
+    if designation == "Other":
+        designation = st.text_input("Enter Designation", key="designation_other")
+
 
     # Date of Joining
     st.markdown("Date of Joining <span style='color:red'>*</span>", unsafe_allow_html=True)
