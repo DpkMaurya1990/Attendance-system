@@ -272,7 +272,37 @@ if menu == "Add Employee":
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
                 
+    #added delete employee section in add employee page to avoid creating a separate page for it            
+    st.divider()
+st.subheader("🗑️ Delete Employee")
 
+# fetch employees
+df_emp = get_employees()
+
+emp_options = {
+    f"{row['name']} (ID: {row['id']})": row['id']
+    for _, row in df_emp.iterrows()
+}
+
+selected_emp_del = st.selectbox("Select Employee to Delete", list(emp_options.keys()), key="delete_emp")
+
+if st.button("Delete Employee", key="delete_emp_btn"):
+    emp_id_del = emp_options[selected_emp_del]
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM employees WHERE id=%s", (emp_id_del,))
+        conn.commit()
+        conn.close()
+
+        st.success("Employee deleted successfully!")
+
+        st.cache_data.clear()
+
+    except Exception as e:
+        st.error(f"Error deleting employee: {e}")
 
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
@@ -413,4 +443,32 @@ elif menu == "View Attendance":
     # Close the modal when JS sends the event
 # --- ALWAYS render modal (important) ---
 show_employee_modal()
+
+#adding delete attendance section in view attendance page to avoid creating a separate page for it
+st.subheader("🗑️ Delete Attendance Record")
+
+df_display = pd.DataFrame(records)
+
+if not df_display.empty:
+    selected_row = st.selectbox(
+        "Select record to delete",
+        df_display.index
+    )
+
+    if st.button("Delete Attendance", key="delete_att_btn"):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            record_id = df_display.loc[selected_row, "id"]
+
+            cursor.execute("DELETE FROM attendance WHERE id=%s", (record_id,))
+            conn.commit()
+            conn.close()
+
+            st.success("Attendance deleted successfully!")
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Error deleting attendance: {e}")        
 
