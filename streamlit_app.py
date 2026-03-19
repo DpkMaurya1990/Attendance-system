@@ -425,9 +425,15 @@ elif menu == "View Attendance":
         df_display = pd.DataFrame(records)
 
         if not df_display.empty:
-            selected_row = st.selectbox(
+            # Create readable options
+            record_options = {
+                f"{row['EName']} | {row['Status']} | {row['Timestamp']}": row["id"]
+                for _, row in df_display.iterrows()
+            }
+
+            selected_record = st.selectbox(
                 "Select record to delete",
-                df_display.index
+                list(record_options.keys())
             )
 
             if st.button("Delete Attendance", key="delete_att_btn"):
@@ -435,7 +441,7 @@ elif menu == "View Attendance":
                     conn = get_db_connection()
                     cursor = conn.cursor()
 
-                    record_id = df_display.loc[selected_row, "id"]
+                    record_id = int(record_options[selected_record])
 
                     cursor.execute("DELETE FROM attendance WHERE id=%s", (record_id,))
                     conn.commit()
