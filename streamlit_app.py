@@ -272,37 +272,49 @@ if menu == "Add Employee":
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
                 
-    #added delete employee section in add employee page to avoid creating a separate page for it            
+#added delete employee section in add employee page to avoid creating a separate page for it            
+# 🗑️ Delete Employee Section
     st.divider()
-st.subheader("🗑️ Delete Employee")
+    st.subheader("🗑️ Delete Employee")
 
-# fetch employees
-df_emp = get_employees()
+    df_emp = get_employees()
 
-emp_options = {
-    f"{row['name']} (ID: {row['id']})": row['id']
-    for _, row in df_emp.iterrows()
-}
+    if df_emp.empty:
+        st.info("No employees available to delete.")
 
-selected_emp_del = st.selectbox("Select Employee to Delete", list(emp_options.keys()), key="delete_emp")
+    else:
+        emp_options = {
+            f"{row['name']} (ID: {row['id']})": row['id']
+            for _, row in df_emp.iterrows()
+        }
 
-if st.button("Delete Employee", key="delete_emp_btn"):
-    emp_id_del = emp_options[selected_emp_del]
+        selected_emp_del = st.selectbox(
+            "Select Employee to Delete",
+            list(emp_options.keys()),
+            key="delete_emp"
+        )
 
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        confirm_delete = st.checkbox("Confirm delete", key="confirm_emp_delete")
 
-        cursor.execute("DELETE FROM employees WHERE id=%s", (emp_id_del,))
-        conn.commit()
-        conn.close()
+        if st.button("Delete Employee", key="delete_emp_btn", disabled=not confirm_delete):
+            emp_id_del = emp_options[selected_emp_del]
 
-        st.success("Employee deleted successfully!")
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
 
-        st.cache_data.clear()
+                cursor.execute("DELETE FROM employees WHERE id=%s", (emp_id_del,))
+                conn.commit()
+                conn.close()
 
-    except Exception as e:
-        st.error(f"Error deleting employee: {e}")
+                st.success("Employee deleted successfully!")
+
+                # ✅ Refresh cache + UI
+                st.cache_data.clear()
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Error deleting employee: {e}")
 
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
@@ -407,6 +419,35 @@ elif menu == "View Attendance":
     if records:
         st.dataframe(records)
 
+        # 🗑️ Delete Attendance Record
+        st.subheader("🗑️ Delete Attendance Record")
+
+        df_display = pd.DataFrame(records)
+
+        if not df_display.empty:
+            selected_row = st.selectbox(
+                "Select record to delete",
+                df_display.index
+            )
+
+            if st.button("Delete Attendance", key="delete_att_btn"):
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+
+                    record_id = df_display.loc[selected_row, "id"]
+
+                    cursor.execute("DELETE FROM attendance WHERE id=%s", (record_id,))
+                    conn.commit()
+                    conn.close()
+
+                    st.success("Attendance deleted successfully!")
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error deleting attendance: {e}")
+                
+            
         from utils import generate_summary, plot_summary_chart
 
         # 📊 Summary
