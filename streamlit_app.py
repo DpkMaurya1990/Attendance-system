@@ -265,16 +265,21 @@ if menu == "Add Employee":
 
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
-
+                
+    #Add caching for employee list to optimize dropdown loading in Mark Attendance page
+    @st.cache_data
+    def get_employees():
+        conn = get_db_connection()
+        df = pd.read_sql("SELECT id, name FROM employees", conn)
+        conn.close()
+        return df
 
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
     st.subheader("🕒 Mark Attendance")
     
     # ✅ Fetch employees for dropdown
-    conn = get_db_connection()
-    df_emp = pd.read_sql("SELECT id, name FROM employees", conn)
-    conn.close()
+    df_emp = get_employees()
 
     emp_options = {
         f"{row['name']} (ID: {row['id']})": row['id']
@@ -343,7 +348,7 @@ elif menu == "View Attendance":
     try:
         conn = get_db_connection()
         query = f"""
-        SELECT * FROM attendance
+        SELECT * FROM attendance ORDER BY marked_time DESC LIMIT 500
         WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY marked_time DESC
         """
