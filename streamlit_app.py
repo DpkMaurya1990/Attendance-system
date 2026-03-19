@@ -128,8 +128,8 @@ def get_db_connection():
         port="6543"
     )
 
-st.set_page_config(page_title="AI Attendance System", layout="centered")
-st.title("🧑‍💼 AI Attendance System")
+st.set_page_config(page_title="Attendance System", layout="centered")
+st.title("🧑‍💼 Attendance System")
 
 # Sidebar menu
 menu = st.sidebar.radio("Menu", ["Add Employee", "Mark Attendance", "View Attendance"])
