@@ -485,31 +485,3 @@ elif menu == "View Attendance":
 # --- ALWAYS render modal (important) ---
 show_employee_modal()
 
-#adding delete attendance section in view attendance page to avoid creating a separate page for it
-st.subheader("🗑️ Delete Attendance Record")
-
-df_display = pd.DataFrame(records)
-
-if not df_display.empty:
-    selected_row = st.selectbox(
-        "Select record to delete",
-        df_display.index
-    )
-
-    if st.button("Delete Attendance", key="delete_att_btn"):
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-
-            record_id = df_display.loc[selected_row, "id"]
-
-            cursor.execute("DELETE FROM attendance WHERE id=%s", (record_id,))
-            conn.commit()
-            conn.close()
-
-            st.success("Attendance deleted successfully!")
-            st.rerun()
-
-        except Exception as e:
-            st.error(f"Error deleting attendance: {e}")        
-
