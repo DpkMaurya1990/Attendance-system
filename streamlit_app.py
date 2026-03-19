@@ -9,7 +9,13 @@ import sqlite3
 import pandas as pd
 import psycopg2
 
-
+#Add caching for employee list to optimize dropdown loading in Mark Attendance page
+@st.cache_data
+def get_employees():
+    conn = get_db_connection()
+    df = pd.read_sql("SELECT id, name FROM employees", conn)
+    conn.close()
+    return df
 
 # ---------- CUSTOM MODAL HELPERS ----------
 def close_employee_modal():
@@ -266,13 +272,7 @@ if menu == "Add Employee":
             except Exception as e:
                 st.error(f"Error adding employee: {e}")
                 
-    #Add caching for employee list to optimize dropdown loading in Mark Attendance page
-    @st.cache_data
-    def get_employees():
-        conn = get_db_connection()
-        df = pd.read_sql("SELECT id, name FROM employees", conn)
-        conn.close()
-        return df
+
 
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
