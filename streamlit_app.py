@@ -184,7 +184,7 @@ def show_employee_modal():
 
 # ------------------- ADD EMPLOYEE PAGE -------------------
 if menu == "Add Employee":
-    st.subheader("➕ Add New Employee")
+    st.subheader("➕ Add New Member")
     st.markdown("Fields marked with * are required")
     # Name
     st.markdown("Name <span style='color:red'>*</span>", unsafe_allow_html=True)
