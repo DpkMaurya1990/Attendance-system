@@ -21,7 +21,10 @@ jobs:
           git config --global user.name "github-actions"
 
           git clone https://user:$HF_TOKEN@huggingface.co/spaces/dpkmaurya2025/Attendance-system repo
-          rsync -av --delete --exclude '.git' ./ repo/
+          rsync -av --delete \
+            --exclude '.git' \
+            --exclude '__pycache__' \
+            ./ repo/ || true
 
           cd repo
           git add .
