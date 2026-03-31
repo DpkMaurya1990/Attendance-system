@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
 
 jobs:
   deploy:
@@ -13,6 +14,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Set HF Space based on branch
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then
+            echo "SPACE=Attendance-system-dev" >> $GITHUB_ENV
+          else
+            echo "SPACE=Attendance-system" >> $GITHUB_ENV
+          fi
+
       - name: Push to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -20,7 +29,8 @@ jobs:
           git config --global user.email "deepak.mau2@gmail.com"
           git config --global user.name "github-actions"
 
-          git clone https://user:$HF_TOKEN@huggingface.co/spaces/dpkmaurya2025/Attendance-system repo
+          git clone https://user:$HF_TOKEN@huggingface.co/spaces/dpkmaurya2025/$SPACE repo
+
           rsync -av --delete \
             --exclude '.git' \
             --exclude '__pycache__' \
@@ -28,5 +38,5 @@ jobs:
 
           cd repo
           git add .
-          git commit -m "Auto deploy from GitHub" || echo "No changes"
+          git commit -m "Auto deploy from GitHub ($SPACE)" || echo "No changes"
           git push
