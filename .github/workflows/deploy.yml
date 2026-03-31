@@ -20,8 +20,8 @@ jobs:
           git config --global user.email "deepak.mau2@gmail.com"
           git config --global user.name "github-actions"
 
-          git clone https://user:$HF_TOKEN@huggingface.co/spaces/dpkmaurya2025/Attendance-system
-          rsync -av --delete ./ repo/
+          git clone https://user:$HF_TOKEN@huggingface.co/spaces/dpkmaurya2025/Attendance-system repo
+          rsync -av --delete --exclude '.git' ./ repo/
 
           cd repo
           git add .
