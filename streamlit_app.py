@@ -355,19 +355,33 @@ elif menu == "Mark Attendance":
 
             current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+            # ✅ Check duplicate attendance
             cursor.execute(
                 """
-                INSERT INTO attendance 
-                (emp_id, status, marked_by, date, marked_time)
-                VALUES (%s, %s, %s, %s, %s)
-            """,
-                (emp_id, status, marked_by, str(date.today()), current_timestamp),
+                SELECT 1 FROM attendance 
+                WHERE emp_id = %s AND date = %s
+                """,
+                (emp_id, str(date.today())),
             )
 
-            conn.commit()
-            conn.close()
+            already_marked = cursor.fetchone()
 
-            st.success("Attendance marked successfully!")
+            if already_marked:
+                st.warning(f"{emp_name} is already marked for today!")
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO attendance 
+                    (emp_id, status, marked_by, date, marked_time)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (emp_id, status, marked_by, str(date.today()), current_timestamp),
+                )
+
+                conn.commit()
+                st.success("Attendance marked successfully!")
+
+            conn.close()
 
         except Exception as e:
             st.error(f"Error marking attendance: {e}")
