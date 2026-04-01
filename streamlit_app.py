@@ -374,7 +374,7 @@ elif menu == "Mark Attendance":
 
     selected_emp = st.selectbox("Select Employee", list(emp_options.keys()))
     emp_id = emp_options[selected_emp]
-    emp_name = selected_emp.split(" (ID")[0]
+    emp_name = selected_emp.split(" (UID")[0]
 
     status = st.selectbox("Status", ["Present", "Absent"])
 
