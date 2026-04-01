@@ -186,6 +186,43 @@ def show_employee_modal():
 
             render_employee_modal(employees)
 
+def mark_attendance_db(emp_id, emp_name, status):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # ✅ Check duplicate
+        cursor.execute(
+            """
+            SELECT 1 FROM attendance 
+            WHERE emp_id = %s AND date = %s
+            """,
+            (emp_id, str(date.today())),
+        )
+
+        if cursor.fetchone():
+            conn.close()
+            return "duplicate"
+
+        # ✅ Insert
+        cursor.execute(
+            """
+            INSERT INTO attendance 
+            (emp_id, status, marked_by, date, marked_time)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (emp_id, status, emp_name, str(date.today()), current_timestamp),
+        )
+
+        conn.commit()
+        conn.close()
+
+        return "success"
+
+    except Exception as e:
+        return str(e)
 
 # ------------------- ADD EMPLOYEE PAGE -------------------
 if menu == "Add Employee":
@@ -349,42 +386,16 @@ elif menu == "Mark Attendance":
     if st.button(
         "Mark Attendance", key="mark_attendance_btn", disabled=not is_valid_employee
     ):
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
+        result = mark_attendance_db(emp_id, emp_name, status)
 
-            current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if result == "duplicate":
+            st.warning(f"{emp_name} is already marked for today!")
 
-            # ✅ Check duplicate attendance
-            cursor.execute(
-                """
-                SELECT 1 FROM attendance 
-                WHERE emp_id = %s AND date = %s
-                """,
-                (emp_id, str(date.today())),
-            )
+        elif result == "success":
+            st.success("Attendance marked successfully!")
 
-            already_marked = cursor.fetchone()
-
-            if already_marked:
-                st.warning(f"{emp_name} is already marked for today!")
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO attendance 
-                    (emp_id, status, marked_by, date, marked_time)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (emp_id, status, marked_by, str(date.today()), current_timestamp),
-                )
-
-                conn.commit()
-                st.success("Attendance marked successfully!")
-
-            conn.close()
-
-        except Exception as e:
-            st.error(f"Error marking attendance: {e}")
+        else:
+            st.error(f"Error: {result}")
 
     st.divider()
     if st.button("🧾 See_Emp", key="see_emp_mark"):
