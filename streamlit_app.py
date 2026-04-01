@@ -15,7 +15,7 @@ import psycopg2
 @st.cache_data
 def get_employees():
     conn = get_db_connection()
-    df = pd.read_sql("SELECT id, name FROM employees", conn)
+    df = pd.read_sql("SELECT id, name, uid FROM employees", conn)
     conn.close()
     return df
 
@@ -282,10 +282,11 @@ if menu == "Add Employee":
 
     else:
         emp_options = {
-            f"{row['name']} (ID: {row['id']})": row["id"]
-            for _, row in df_emp.iterrows()
-        }
-
+    f"{row['name']} (UID: {row['uid']})": row["id"]
+    for _, row in df_emp.iterrows()
+    }
+        
+        
         selected_emp_del = st.selectbox(
             "Select Employee to Delete", list(emp_options.keys()), key="delete_emp"
         )
@@ -322,8 +323,11 @@ elif menu == "Mark Attendance":
     df_emp = get_employees()
 
     emp_options = {
-        f"{row['name']} (ID: {row['id']})": row["id"] for _, row in df_emp.iterrows()
-    }
+    f"{row['name']} (UID: {row['uid']})": row["id"]
+    for _, row in df_emp.iterrows()
+}
+    
+    
     # ✅ Dropdown
 
     selected_emp = st.selectbox("Select Employee", list(emp_options.keys()))
