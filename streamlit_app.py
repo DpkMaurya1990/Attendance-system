@@ -223,6 +223,38 @@ def mark_attendance_db(emp_id, emp_name, status):
 
     except Exception as e:
         return str(e)
+    
+    
+def add_employee_db(name, department, doj, uid):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # ✅ Duplicate check
+        cursor.execute(
+            "SELECT 1 FROM employees WHERE uid = %s", (uid,)
+        )
+
+        if cursor.fetchone():
+            conn.close()
+            return "duplicate"
+
+        # ✅ Insert
+        cursor.execute(
+            """
+            INSERT INTO employees (name, department, doj, uid)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (name, department, str(doj), uid),
+        )
+
+        conn.commit()
+        conn.close()
+
+        return "success"
+
+    except Exception as e:
+        return str(e)    
 
 # ------------------- ADD EMPLOYEE PAGE -------------------
 if menu == "Add Employee":
@@ -264,48 +296,21 @@ if menu == "Add Employee":
 
     
     if st.button("Add Employee", key="add_employee_btn_main"):
-        # ✅ Validation (designation removed)
         if not name or not department or not doj or not uid:
             st.warning("Please fill all required fields.")
 
         else:
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
+            result = add_employee_db(name, department, doj, uid)
 
-                # ✅ Duplicate check
-                cursor.execute(
-                    "SELECT 1 FROM employees WHERE uid = %s", (uid,)
-                )
-                existing = cursor.fetchone()
+            if result == "duplicate":
+                st.error("UID already exists. Please use a unique UID.")
 
-                if existing:
-                    st.error("UID already exists. Please use a unique ID.")
+            elif result == "success":
+                st.success("Employee added successfully!")
+                st.cache_data.clear()
 
-                else:
-                    cursor.execute(
-                        """
-                        INSERT INTO employees 
-                        (name, department, doj, uid)
-                        VALUES (%s, %s, %s, %s)
-                        """,
-                        (
-                            name,
-                            department,
-                            str(doj),
-                            uid,
-                        ),
-                    )
-
-                    conn.commit()
-                    conn.close()
-                    st.success("Employee added successfully!")
-
-                    # ✅ refresh cache
-                    st.cache_data.clear()
-
-            except Exception as e:
-                st.error(f"Error adding employee: {e}")
+            else:
+                st.error(f"Error: {result}")
 
     # added delete employee section in add employee page to avoid creating a separate page for it
     # 🗑️ Delete Employee Section
