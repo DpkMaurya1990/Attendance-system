@@ -221,14 +221,14 @@ if menu == "Add Employee":
     )
     doj = st.date_input("", key="doj")
 
-    # Manual ID
-    st.markdown("Manual ID <span style='color:red'>*</span>", unsafe_allow_html=True)
-    manual_id = st.text_input("", key="manual_id")
+    # UID
+    st.markdown("UID <span style='color:red'>*</span>", unsafe_allow_html=True)
+    uid = st.text_input("", key="uid")
 
     
     if st.button("Add Employee", key="add_employee_btn_main"):
         # ✅ Validation (designation removed)
-        if not name or not department or not doj or not manual_id:
+        if not name or not department or not doj or not uid:
             st.warning("Please fill all required fields.")
 
         else:
@@ -238,25 +238,25 @@ if menu == "Add Employee":
 
                 # ✅ Duplicate check
                 cursor.execute(
-                    "SELECT 1 FROM employees WHERE manual_id = %s", (manual_id,)
+                    "SELECT 1 FROM employees WHERE uid = %s", (uid,)
                 )
                 existing = cursor.fetchone()
 
                 if existing:
-                    st.error("Manual ID already exists. Please use a unique ID.")
+                    st.error("UID already exists. Please use a unique ID.")
 
                 else:
                     cursor.execute(
                         """
                         INSERT INTO employees 
-                        (name, department, doj, manual_id)
+                        (name, department, doj, uid)
                         VALUES (%s, %s, %s, %s)
                         """,
                         (
                             name,
                             department,
                             str(doj),
-                            manual_id,
+                            uid,
                         ),
                     )
 
