@@ -1,4 +1,4 @@
-import sys, os
+﻿import sys, os
 import streamlit.components.v1 as components
 
 # Add the parent directory (E:\attend) to Python path
@@ -9,6 +9,36 @@ from datetime import date, datetime
 import sqlite3
 import pandas as pd
 import psycopg2
+
+TIME_OPTIONS = [
+    datetime.strptime(f"{hour:02d}:{minute:02d}", "%H:%M").strftime("%I:%M %p")
+    for hour in range(24)
+    for minute in (0, 30)
+]
+
+
+def ensure_attendance_schema():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "ALTER TABLE attendance ADD COLUMN IF NOT EXISTS event_member_id INTEGER"
+    )
+    cursor.execute(
+        "ALTER TABLE attendance ADD COLUMN IF NOT EXISTS event_member_name TEXT"
+    )
+    cursor.execute(
+        "ALTER TABLE attendance ADD COLUMN IF NOT EXISTS event_status TEXT"
+    )
+    cursor.execute(
+        "ALTER TABLE attendance ADD COLUMN IF NOT EXISTS event_from_time TEXT"
+    )
+    cursor.execute(
+        "ALTER TABLE attendance ADD COLUMN IF NOT EXISTS event_to_time TEXT"
+    )
+
+    conn.commit()
+    conn.close()
 
 
 # Add caching for employee list to optimize dropdown loading in Mark Attendance page
@@ -134,6 +164,7 @@ def get_db_connection():
 
 st.set_page_config(page_title="Attendance System", layout="centered")
 st.title("🧑‍💼 Attendance System 🚀 DEV")
+ensure_attendance_schema()
 
 # Sidebar menu
 menu = st.sidebar.radio("Menu", ["Add Employee", "Mark Attendance", "View Attendance"])
@@ -186,17 +217,25 @@ def show_employee_modal():
 
             render_employee_modal(employees)
 
-def mark_attendance_db(emp_id, emp_name, status):
+def mark_attendance_db(
+    emp_id,
+    emp_name,
+    status,
+    event_member_id,
+    event_member_name,
+    event_status,
+    event_from_time,
+    event_to_time,
+):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
         current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # ✅ Check duplicate
         cursor.execute(
             """
-            SELECT 1 FROM attendance 
+            SELECT 1 FROM attendance
             WHERE emp_id = %s AND date = %s
             """,
             (emp_id, str(date.today())),
@@ -206,14 +245,35 @@ def mark_attendance_db(emp_id, emp_name, status):
             conn.close()
             return "duplicate"
 
-        # ✅ Insert
         cursor.execute(
             """
-            INSERT INTO attendance 
-            (emp_id, status, marked_by, date, marked_time)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO attendance
+            (
+                emp_id,
+                status,
+                marked_by,
+                date,
+                marked_time,
+                event_member_id,
+                event_member_name,
+                event_status,
+                event_from_time,
+                event_to_time
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (emp_id, status, emp_name, str(date.today()), current_timestamp),
+            (
+                emp_id,
+                status,
+                emp_name,
+                str(date.today()),
+                current_timestamp,
+                event_member_id,
+                event_member_name,
+                event_status,
+                event_from_time,
+                event_to_time,
+            ),
         )
 
         conn.commit()
@@ -256,7 +316,7 @@ def add_employee_db(name, department, doj, uid):
     except Exception as e:
         return str(e)    
 
-# ------------------- ADD EMPLOYEE PAGE -------------------
+# ------------------- ADD EMPLOYEE PAGEs -------------------
 if menu == "Add Employee":
     st.subheader("➕ Add New Member")
     st.markdown("Fields marked with * are required")
@@ -378,20 +438,95 @@ elif menu == "Mark Attendance":
 
     status = st.selectbox("Status", ["Present", "Absent"])
 
-    # ✅ Check if employee ID exists
+    event_member_options = ["N/A"] + list(emp_options.keys())
+
+    selected_event_member = st.selectbox(
+        "Event_member", event_member_options, key="event_member_select"
+    )
+
+    if selected_event_member == "N/A":
+        event_member_id = None
+        event_member_name = "N/A"
+        event_status = "N/A"
+        event_from_time = None
+        event_to_time = None
+
+        st.selectbox(
+            "Event Status",
+            ["N/A"],
+            index=0,
+            disabled=True,
+            key="event_status_disabled",
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input("From Time", value="N/A", disabled=True, key="event_from_na")
+        with col2:
+            st.text_input("To Time", value="N/A", disabled=True, key="event_to_na")
+
+    else:
+        event_member_id = emp_options[selected_event_member]
+        event_member_name = selected_event_member.split(" (UID")[0]
+
+        event_status = st.selectbox(
+            "Event Status", ["Present", "Absent"], key="event_status"
+        )
+
+        event_from_time = None
+        event_to_time = None
+
+        if event_status == "Present":
+            col1, col2 = st.columns(2)
+
+            with col1:
+                event_from_time = st.selectbox(
+                    "From Time", TIME_OPTIONS, key="event_from_time"
+                )
+
+            with col2:
+                event_to_time = st.selectbox(
+                    "To Time", TIME_OPTIONS, index=8, key="event_to_time"
+                )
+
+            if TIME_OPTIONS.index(event_from_time) >= TIME_OPTIONS.index(event_to_time):
+                st.error("To Time must be after From Time.")
+
     if emp_id > 0 and not emp_name:
         st.error("Employee not found!")
 
     is_valid_employee = emp_id > 0 and emp_name != ""
+    is_valid_event_member = selected_event_member == "N/A" or (
+        event_member_id is not None and event_member_name != ""
+    )
+    is_valid_event_time = selected_event_member == "N/A" or (
+        event_status == "Absent"
+        or (
+            event_from_time is not None
+            and event_to_time is not None
+            and TIME_OPTIONS.index(event_from_time) < TIME_OPTIONS.index(event_to_time)
+        )
+    )
 
-    # Replace Emp_Name field with a disabled text input showing the name of the selected employee
     st.text_input("Emp_Name", value=emp_name, disabled=True)
+    st.text_input("Event Member Name", value=event_member_name, disabled=True)
     marked_by = emp_name
 
     if st.button(
-        "Mark Attendance", key="mark_attendance_btn", disabled=not is_valid_employee
+        "Mark Attendance",
+        key="mark_attendance_btn",
+        disabled=not (is_valid_employee and is_valid_event_member and is_valid_event_time),
     ):
-        result = mark_attendance_db(emp_id, emp_name, status)
+        result = mark_attendance_db(
+            emp_id,
+            emp_name,
+            status,
+            event_member_id,
+            event_member_name,
+            event_status,
+            event_from_time,
+            event_to_time,
+        )
 
         if result == "duplicate":
             st.warning(f"{emp_name} is already marked for today!")
@@ -432,7 +567,11 @@ elif menu == "View Attendance":
                 "emp_id": "Employee ID",
                 "marked_time": "Timestamp",
                 "marked_by": "EName",
-                "status": "status",
+                "status": "Status",
+                "event_member_name": "Event Member",
+                "event_status": "Event Status",
+                "event_from_time": "Event From",
+                "event_to_time": "Event To",
             },
             inplace=True,
         )
@@ -501,11 +640,22 @@ elif menu == "View Attendance":
         from utils import generate_summary, plot_summary_chart
 
         # 📊 Summary
-        summary_df = generate_summary(records)
-        st.write("### 📊 Summary Report")
-        st.dataframe(summary_df)
+        normal_summary_df = generate_summary(records, "Status")
+        st.write("### Regular Attendance Summary")
+        st.dataframe(normal_summary_df)
 
-        # 📥 CSV Download (filtered data)
+        if not normal_summary_df.empty:
+            normal_chart_path = plot_summary_chart(normal_summary_df)
+            st.image(normal_chart_path)
+
+        event_summary_df = generate_summary(records, "Event Status")
+        st.write("### Event Attendance Summary")
+        st.dataframe(event_summary_df)
+
+        if not event_summary_df.empty:
+            event_chart_path = plot_summary_chart(event_summary_df)
+            st.image(event_chart_path)
+
         csv = df.to_csv(index=False).encode("utf-8")
 
         st.download_button(
@@ -514,17 +664,6 @@ elif menu == "View Attendance":
             file_name="attendance_report.csv",
             mime="text/csv",
         )
-
-        # 📈 Chart
-        if "chart_generated" not in st.session_state:
-            chart_path = plot_summary_chart(summary_df)
-            st.session_state["chart_path"] = chart_path
-            st.session_state["chart_generated"] = True
-
-        st.image(st.session_state["chart_path"])
-
-    else:
-        st.info("No attendance records found.")
 
     st.divider()
     if st.button("🧾 See_Emp", key="see_emp_view"):

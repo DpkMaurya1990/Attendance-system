@@ -3,10 +3,24 @@ import matplotlib.pyplot as plt
 import os
 
 
-def generate_summary(records):
+def generate_summary(records, column_name=None):
     df = pd.DataFrame(records)
 
-    summary = df.groupby("status").size().reset_index(name="count")
+    if column_name is None:
+        column_name = "Status" if "Status" in df.columns else "status"
+
+    if column_name not in df.columns:
+        return pd.DataFrame(columns=[column_name, "count"])
+
+    df = df[df[column_name].notna()]
+
+    if column_name == "Event Status":
+        df = df[df[column_name] != "N/A"]
+
+    if df.empty:
+        return pd.DataFrame(columns=[column_name, "count"])
+
+    summary = df.groupby(column_name).size().reset_index(name="count")
     return summary
 
 
@@ -17,14 +31,20 @@ def save_attendance_to_csv(records):
     return file_path
 
 
-def plot_summary_chart(summary_df):
-    file_path = "attendance_chart.png"
+def plot_summary_chart(summary_df, label_column=None, file_path="attendance_chart.png"):
+    if label_column is None:
+        if "Status" in summary_df.columns:
+            label_column = "Status"
+        elif "Event Status" in summary_df.columns:
+            label_column = "Event Status"
+        else:
+            label_column = "status"
 
-    plt.figure(figsize=(4, 3))  # smaller chart
-    plt.bar(summary_df["status"], summary_df["count"])
-    plt.xlabel("Status")
+    plt.figure(figsize=(4, 3))
+    plt.bar(summary_df[label_column], summary_df["count"])
+    plt.xlabel(label_column)
     plt.ylabel("Count")
-    plt.title("Attendance Summary")
+    plt.title(f"{label_column} Summary")
 
     plt.savefig(file_path)
     plt.close("all")
