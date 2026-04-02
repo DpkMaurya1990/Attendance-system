@@ -44,10 +44,13 @@ def ensure_attendance_schema():
 # Add caching for employee list to optimize dropdown loading in Mark Attendance page
 @st.cache_data
 def get_employees():
-    conn = get_db_connection()
-    df = pd.read_sql("SELECT id, name, uid FROM employees", conn)
-    conn.close()
-    return df
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql("SELECT id, name, uid FROM employees", conn)
+        conn.close()
+        return df
+    except Exception as e:
+        return pd.DataFrame(columns=["id", "name", "uid"])
 
 
 # ---------- CUSTOM MODAL HELPERS ----------
@@ -159,6 +162,7 @@ def get_db_connection():
         user="postgres.rejmmghqbhtgmeedlmea",
         password="Alliswell@0605",
         port="6543",
+        connect_timeout=10,
     )
 
 
