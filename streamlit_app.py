@@ -164,7 +164,7 @@ def get_db_connection():
 
 st.set_page_config(page_title="Attendance System", layout="centered")
 st.title("🧑‍💼 Attendance System 🚀 DEV")
-ensure_attendance_schema()
+
 
 # Sidebar menu
 menu = st.sidebar.radio("Menu", ["Add Employee", "Mark Attendance", "View Attendance"])
@@ -236,14 +236,27 @@ def mark_attendance_db(
         cursor.execute(
             """
             SELECT 1 FROM attendance
-            WHERE emp_id = %s AND date = %s
+            WHERE (emp_id = %s OR event_member_id = %s) AND date = %s
             """,
-            (emp_id, str(date.today())),
+            (emp_id, emp_id, str(date.today())),
         )
 
         if cursor.fetchone():
             conn.close()
-            return "duplicate"
+            return "duplicate_employee"
+
+        if event_member_id is not None:
+            cursor.execute(
+                """
+                SELECT 1 FROM attendance
+                WHERE (emp_id = %s OR event_member_id = %s) AND date = %s
+                """,
+                (event_member_id, event_member_id, str(date.today())),
+            )
+
+            if cursor.fetchone():
+                conn.close()
+                return "duplicate_event_member"
 
         cursor.execute(
             """
@@ -528,11 +541,17 @@ elif menu == "Mark Attendance":
             event_to_time,
         )
 
-        if result == "duplicate":
+        if result == "duplicate_employee":
             st.warning(f"{emp_name} is already marked for today!")
 
+        elif result == "duplicate_event_member":
+            st.warning(f"{event_member_name} is already marked in Event_member for today!")
+
         elif result == "success":
+            st.session_state.pop("chart_path", None)
+            st.session_state.pop("chart_generated", None)
             st.success("Attendance marked successfully!")
+            
 
         else:
             st.error(f"Error: {result}")
@@ -630,6 +649,9 @@ elif menu == "View Attendance":
                     import time
 
                     time.sleep(1)
+                    
+                    st.session_state.pop("chart_path", None)
+                    st.session_state.pop("chart_generated", None)
 
                     # ✅ Then refresh
                     st.rerun()
@@ -637,8 +659,68 @@ elif menu == "View Attendance":
                 except Exception as e:
                     st.error(f"Error deleting attendance: {e}")
 
-        from utils import generate_summary, plot_summary_chart
+        st.subheader("Delete Event Member Record")
 
+        event_record_options = {
+            f"{row.get('Event Member', '')} | {row.get('Event Status', '')} | {row.get('Timestamp', '')}": row["id"]
+            for _, row in df_display.iterrows()
+            if str(row.get("Event Member", "")).strip() not in ["", "N/A", "None", "nan"]
+        }
+
+        if event_record_options:
+            selected_event_record = st.selectbox(
+                "Select event record to delete",
+                list(event_record_options.keys()),
+                key="delete_event_record",
+            )
+
+            confirm_event_delete = st.checkbox(
+                "Confirm event delete", key="confirm_event_delete"
+            )
+
+            if st.button(
+                "Delete Event Member",
+                key="delete_event_btn",
+                disabled=not confirm_event_delete,
+            ):
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+
+                    event_record_id = int(event_record_options[selected_event_record])
+
+                    cursor.execute(
+                        """
+                        UPDATE attendance
+                        SET
+                            event_member_id = NULL,
+                            event_member_name = 'N/A',
+                            event_status = 'N/A',
+                            event_from_time = NULL,
+                            event_to_time = NULL
+                        WHERE id = %s
+                        """,
+                        (event_record_id,),
+                    )
+
+                    conn.commit()
+                    conn.close()
+
+                    st.success("Event member record deleted successfully!")
+
+                    import time
+
+                    time.sleep(1)
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error deleting event member record: {e}")
+        else:
+            st.info("No event member records available to delete.")
+        
+        from utils import generate_summary, plot_summary_chart
+        
+        
         # 📊 Summary
         normal_summary_df = generate_summary(records, "Status")
         st.write("### Regular Attendance Summary")
