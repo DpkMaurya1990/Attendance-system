@@ -616,40 +616,38 @@ elif menu == "View Attendance":
         conn = get_db_connection()
 
         regular_query = f"""
-        SELECT * FROM attendance
-        WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
-        ORDER BY marked_time DESC
+        SELECT
+            a.id,
+            e.uid AS "UID",
+            a.marked_by AS "EName",
+            a.status AS "Status",
+            a.date,
+            a.marked_time AS "Timestamp"
+        FROM attendance a
+        LEFT JOIN employees e ON a.emp_id = e.id
+        WHERE date(a.marked_time) BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY a.marked_time DESC
         LIMIT 500
         """
         df = pd.read_sql(regular_query, conn)
-        df.rename(
-            columns={
-                "emp_id": "Employee ID",
-                "marked_time": "Timestamp",
-                "marked_by": "EName",
-                "status": "Status",
-            },
-            inplace=True,
-        )
 
         event_query = f"""
-        SELECT * FROM event_attendance
-        WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
-        ORDER BY marked_time DESC
+        SELECT
+            ea.id,
+            e.uid AS "UID",
+            ea.event_member_name AS "Event Member",
+            ea.event_status AS "Event Status",
+            ea.event_from_time AS "Event From",
+            ea.event_to_time AS "Event To",
+            ea.date,
+            ea.marked_time AS "Timestamp"
+        FROM event_attendance ea
+        LEFT JOIN employees e ON ea.event_member_id = e.id
+        WHERE date(ea.marked_time) BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY ea.marked_time DESC
         LIMIT 500
         """
         event_df = pd.read_sql(event_query, conn)
-        event_df.rename(
-            columns={
-                "event_member_id": "Event Member ID",
-                "event_member_name": "Event Member",
-                "event_status": "Event Status",
-                "event_from_time": "Event From",
-                "event_to_time": "Event To",
-                "marked_time": "Timestamp",
-            },
-            inplace=True,
-        )
 
         conn.close()
 
@@ -667,13 +665,15 @@ elif menu == "View Attendance":
     # ✅ OUTSIDE try/except (IMPORTANT)
     if records:
         st.write("### Regular Attendance Records")
-        st.dataframe(records)
+        regular_display_df = pd.DataFrame(records).drop(columns=["id"], errors="ignore")
+        st.dataframe(regular_display_df)
     else:
         st.info("No regular attendance records found.")
 
     if event_records:
         st.write("### Event Attendance Records")
-        st.dataframe(event_records)
+        event_display_df = pd.DataFrame(event_records).drop(columns=["id"], errors="ignore")
+        st.dataframe(event_display_df)
     else:
         st.info("No event attendance records found.")
 
