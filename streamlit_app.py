@@ -165,6 +165,32 @@ def get_db_connection():
         connect_timeout=10,
     )
 
+def ensure_event_attendance_table():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS event_attendance (
+                id SERIAL PRIMARY KEY,
+                attendance_id INTEGER,
+                event_member_id INTEGER NOT NULL,
+                event_member_name TEXT NOT NULL,
+                event_status TEXT NOT NULL,
+                event_from_time TEXT,
+                event_to_time TEXT,
+                date DATE NOT NULL,
+                marked_time TIMESTAMP NOT NULL
+            )
+            """
+        )
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error creating event_attendance table: {e}")
+        
 
 st.set_page_config(page_title="Attendance System", layout="centered")
 st.title("🧑‍💼 Attendance System 🚀 DEV")
@@ -236,13 +262,14 @@ def mark_attendance_db(
         cursor = conn.cursor()
 
         current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        today_date = str(date.today())
 
         cursor.execute(
             """
             SELECT 1 FROM attendance
-            WHERE (emp_id = %s OR event_member_id = %s) AND date = %s
+            WHERE emp_id = %s AND date = %s
             """,
-            (emp_id, emp_id, str(date.today())),
+            (emp_id, today_date),
         )
 
         if cursor.fetchone():
@@ -252,10 +279,10 @@ def mark_attendance_db(
         if event_member_id is not None:
             cursor.execute(
                 """
-                SELECT 1 FROM attendance
-                WHERE (emp_id = %s OR event_member_id = %s) AND date = %s
+                SELECT 1 FROM event_attendance
+                WHERE event_member_id = %s AND date = %s
                 """,
-                (event_member_id, event_member_id, str(date.today())),
+                (event_member_id, today_date),
             )
 
             if cursor.fetchone():
@@ -265,33 +292,42 @@ def mark_attendance_db(
         cursor.execute(
             """
             INSERT INTO attendance
-            (
-                emp_id,
-                status,
-                marked_by,
-                date,
-                marked_time,
-                event_member_id,
-                event_member_name,
-                event_status,
-                event_from_time,
-                event_to_time
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (emp_id, status, marked_by, date, marked_time)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
             """,
-            (
-                emp_id,
-                status,
-                emp_name,
-                str(date.today()),
-                current_timestamp,
-                event_member_id,
-                event_member_name,
-                event_status,
-                event_from_time,
-                event_to_time,
-            ),
+            (emp_id, status, emp_name, today_date, current_timestamp),
         )
+
+        attendance_id = cursor.fetchone()[0]
+
+        if event_member_id is not None and event_member_name != "N/A":
+            cursor.execute(
+                """
+                INSERT INTO event_attendance
+                (
+                    attendance_id,
+                    event_member_id,
+                    event_member_name,
+                    event_status,
+                    event_from_time,
+                    event_to_time,
+                    date,
+                    marked_time
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    attendance_id,
+                    event_member_id,
+                    event_member_name,
+                    event_status,
+                    event_from_time,
+                    event_to_time,
+                    today_date,
+                    current_timestamp,
+                ),
+            )
 
         conn.commit()
         conn.close()
@@ -578,149 +614,177 @@ elif menu == "View Attendance":
 
     try:
         conn = get_db_connection()
-        query = f"""
+
+        regular_query = f"""
         SELECT * FROM attendance
         WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY marked_time DESC
         LIMIT 500
         """
-        df = pd.read_sql(query, conn)
+        df = pd.read_sql(regular_query, conn)
         df.rename(
             columns={
                 "emp_id": "Employee ID",
                 "marked_time": "Timestamp",
                 "marked_by": "EName",
                 "status": "Status",
+            },
+            inplace=True,
+        )
+
+        event_query = f"""
+        SELECT * FROM event_attendance
+        WHERE date(marked_time) BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY marked_time DESC
+        LIMIT 500
+        """
+        event_df = pd.read_sql(event_query, conn)
+        event_df.rename(
+            columns={
+                "event_member_id": "Event Member ID",
                 "event_member_name": "Event Member",
                 "event_status": "Event Status",
                 "event_from_time": "Event From",
                 "event_to_time": "Event To",
+                "marked_time": "Timestamp",
             },
             inplace=True,
         )
+
         conn.close()
 
         records = df.to_dict(orient="records")
+        event_records = event_df.to_dict(orient="records")
 
     except Exception as e:
         st.error(f"Error fetching attendance: {e}")
         records = []
+        event_records = []
 
     if not records:
         st.session_state.pop("csv_path", None)
 
     # ✅ OUTSIDE try/except (IMPORTANT)
     if records:
+        st.write("### Regular Attendance Records")
         st.dataframe(records)
+    else:
+        st.info("No regular attendance records found.")
 
-        # 🗑️ Delete Attendance Record
-        st.subheader("🗑️ Delete Attendance Record")
+    if event_records:
+        st.write("### Event Attendance Records")
+        st.dataframe(event_records)
+    else:
+        st.info("No event attendance records found.")
 
-        df_display = pd.DataFrame(records)
+    df_display = pd.DataFrame(records)
+    event_df_display = pd.DataFrame(event_records)
 
-        if not df_display.empty:
+    # 🗑️ Delete Attendance Record
+    st.subheader("🗑️ Delete Attendance Record")
+    
+    if not df_display.empty:
 
-            record_options = {
-                f"{row.get('EName', '')} | {row.get('Status', row.get('status', ''))} | {row.get('Timestamp', '')}": row[
-                    "id"
-                ]
-                for _, row in df_display.iterrows()
-            }
-
-            selected_record = st.selectbox(
-                "Select record to delete", list(record_options.keys())
-            )
-
-            confirm_delete = st.checkbox("Confirm delete", key="confirm_att_delete")
-
-            if st.button(
-                "Delete Attendance", key="delete_att_btn", disabled=not confirm_delete
-            ):
-                try:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-
-                    record_id = int(record_options[selected_record])
-
-                    cursor.execute("DELETE FROM attendance WHERE id=%s", (record_id,))
-                    conn.commit()
-                    conn.close()
-
-                    # ✅ Show message FIRST
-                    st.success("Attendance deleted successfully!")
-
-                    # ✅ Small delay (important)
-                    import time
-
-                    time.sleep(1)
-                    
-                    st.session_state.pop("chart_path", None)
-                    st.session_state.pop("chart_generated", None)
-
-                    # ✅ Then refresh
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Error deleting attendance: {e}")
-
-        st.subheader("Delete Event Member Record")
-
-        event_record_options = {
-            f"{row.get('Event Member', '')} | {row.get('Event Status', '')} | {row.get('Timestamp', '')}": row["id"]
+        record_options = {
+            f"{row.get('EName', '')} | {row.get('Status', row.get('status', ''))} | {row.get('Timestamp', '')}": row[
+                "id"
+            ]
             for _, row in df_display.iterrows()
-            if str(row.get("Event Member", "")).strip() not in ["", "N/A", "None", "nan"]
         }
 
-        if event_record_options:
-            selected_event_record = st.selectbox(
-                "Select event record to delete",
-                list(event_record_options.keys()),
-                key="delete_event_record",
-            )
+        selected_record = st.selectbox(
+            "Select record to delete", list(record_options.keys())
+        )
 
-            confirm_event_delete = st.checkbox(
-                "Confirm event delete", key="confirm_event_delete"
-            )
+        if st.session_state.pop("reset_confirm_att_delete", False):
+            st.session_state["confirm_att_delete"] = False
 
-            if st.button(
-                "Delete Event Member",
-                key="delete_event_btn",
-                disabled=not confirm_event_delete,
-            ):
-                try:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
+        confirm_delete = st.checkbox("Confirm delete", key="confirm_att_delete")
 
-                    event_record_id = int(event_record_options[selected_event_record])
+        if st.button(
+            "Delete Attendance", key="delete_att_btn", disabled=not confirm_delete
+        ):
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
 
-                    cursor.execute(
-                        """
-                        UPDATE attendance
-                        SET
-                            event_member_id = NULL,
-                            event_member_name = 'N/A',
-                            event_status = 'N/A',
-                            event_from_time = NULL,
-                            event_to_time = NULL
-                        WHERE id = %s
-                        """,
-                        (event_record_id,),
-                    )
+                record_id = int(record_options[selected_record])
 
-                    conn.commit()
-                    conn.close()
+                cursor.execute("DELETE FROM attendance WHERE id=%s", (record_id,))
+                conn.commit()
+                conn.close()
 
-                    st.success("Event member record deleted successfully!")
+                # ✅ Show message FIRST
+                st.success("Attendance deleted successfully!")
 
-                    import time
+                # ✅ Small delay (important)
+                import time
 
-                    time.sleep(1)
-                    st.rerun()
+                time.sleep(1)
 
-                except Exception as e:
-                    st.error(f"Error deleting event member record: {e}")
-        else:
-            st.info("No event member records available to delete.")
+                st.session_state["reset_confirm_att_delete"] = True
+                st.session_state.pop("chart_path", None)
+                st.session_state.pop("chart_generated", None)
+
+                # ✅ Then refresh
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Error deleting attendance: {e}")
+
+    st.subheader("Delete Event Member Record")
+
+    event_record_options = {
+        f"{row.get('Event Member', '')} | {row.get('Event Status', '')} | {row.get('Timestamp', '')}": row["id"]
+        for _, row in event_df_display.iterrows()
+    }
+
+    if event_record_options:
+        selected_event_record = st.selectbox(
+            "Select event record to delete",
+            list(event_record_options.keys()),
+            key="delete_event_record",
+        )
+
+        if st.session_state.pop("reset_confirm_event_delete", False):
+            st.session_state["confirm_event_delete"] = False
+
+        confirm_event_delete = st.checkbox(
+            "Confirm event delete", key="confirm_event_delete"
+        )
+
+        if st.button(
+            "Delete Event Member",
+            key="delete_event_btn",
+            disabled=not confirm_event_delete,
+        ):
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+
+                event_record_id = int(event_record_options[selected_event_record])
+
+                cursor.execute(
+                    "DELETE FROM event_attendance WHERE id = %s",
+                    (event_record_id,),
+                )
+
+                conn.commit()
+                conn.close()
+
+                st.success("Event member record deleted successfully!")
+
+                import time
+
+                time.sleep(1)
+
+                st.session_state["reset_confirm_event_delete"] = True
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Error deleting event member record: {e}")
+    else:
+        st.info("No event member records available to delete.")
         
         from utils import generate_summary, plot_summary_chart
         
