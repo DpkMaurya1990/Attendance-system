@@ -40,13 +40,14 @@ def plot_summary_chart(summary_df, label_column=None, file_path="attendance_char
         else:
             label_column = "status"
 
-    plt.figure(figsize=(4, 3))
+    plt.figure(figsize=(5, 4))
     plt.bar(summary_df[label_column], summary_df["count"])
     plt.xlabel(label_column)
     plt.ylabel("Count")
     plt.title(f"{label_column} Summary")
+    plt.tight_layout()
 
-    plt.savefig(file_path)
+    plt.savefig(file_path, bbox_inches="tight")
     plt.close("all")
 
     return file_path

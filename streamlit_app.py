@@ -1,5 +1,7 @@
 ﻿import sys, os
-import streamlit.components.v1 as components
+import base64
+from pathlib import Path
+
 
 # Add the parent directory (E:\attend) to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -52,105 +54,6 @@ def get_employees():
     except Exception as e:
         return pd.DataFrame(columns=["id", "name", "uid"])
 
-
-# ---------- CUSTOM MODAL HELPERS ----------
-def close_employee_modal():
-    st.session_state["show_modal"] = False
-
-
-def render_employee_modal(employees):
-    """Displays a centered popup overlay with employee table inside and working close button."""
-    import pandas as pd
-    import json
-    import streamlit.components.v1 as components
-
-    # Convert to DataFrame if list/dict
-    df = pd.DataFrame(employees)
-    table_html = df.to_html(index=False, classes="employee-table")
-
-    modal_html = f"""
-    <html>
-    <head>
-    <style>
-    .modal-overlay {{
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background-color: rgba(0,0,0,0.55);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 9999;
-    }}
-    .modal-content {{
-        background-color: #ffffff;
-        width: 75%;
-        max-height: 80%;
-        overflow-y: auto;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        padding: 25px;
-        position: relative;
-        animation: fadeIn 0.25s ease-in-out;
-    }}
-    .modal-close {{
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        background: #f44336;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 4px 8px;
-        cursor: pointer;
-        font-size: 0.9rem;
-    }}
-    .employee-table {{
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.9rem;
-    }}
-    .employee-table th, .employee-table td {{
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-    }}
-    .employee-table th {{
-        background-color: #4CAF50;
-        color: white;
-    }}
-    @keyframes fadeIn {{
-        from {{ opacity: 0; transform: scale(0.9); }}
-        to {{ opacity: 1; transform: scale(1); }}
-    }}
-    </style>
-    </head>
-    <body>
-    <div class="modal-overlay" id="employee-modal">
-      <div class="modal-content">
-        <button class="modal-close" onclick="document.getElementById('employee-modal').remove()">✖</button>
-        <h3>📋 Employee List</h3>
-        <p>List of Employees (Emp_ID | Name | Manual_ID)</p>
-        {table_html}
-      </div>
-    </div>
-
-    <script>
-    function closeModal() {{
-        const modal = document.getElementById("employee-modal");
-        if (modal) {{
-            modal.remove();
-        }}
-    }}
-    
-    // Notify Streamlit backend to update state
-    
-    </script>
-    </body>
-    </html>
-    """
-
-    components.html(modal_html, height=700, scrolling=True)
-
-
 # Backend API base URL
 API_URL = "http://127.0.0.1:8000"
 
@@ -191,61 +94,52 @@ def ensure_event_attendance_table():
     except Exception as e:
         st.error(f"Error creating event_attendance table: {e}")
         
+        
+def ensure_performance_indexes():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_attendance_emp_date ON attendance (emp_id, date)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance (date)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_attendance_member_date ON event_attendance (event_member_id, date)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_event_attendance_date ON event_attendance (date)"
+        )
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error creating performance indexes: {e}")       
+        
+def get_base64_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode()    
+    
 
 st.set_page_config(page_title="Attendance System", layout="centered")
-st.title("🧑‍💼 Attendance System 🚀 DEV")
-
 
 # Sidebar menu
-menu = st.sidebar.radio("Menu", ["Add Employee", "Mark Attendance", "View Attendance"])
+menu = st.sidebar.radio(
+    "Menu",
+    ["Home", "Add Member", "Mark Attendance", "View Attendance", "Analytics", "Member List"],
+)
 
+if menu != "Home":
+    st.title("🧑‍💼 Attendance System 🚀 DEV")
+    
 # Reset modal when page changes
 if "last_menu" not in st.session_state:
     st.session_state["last_menu"] = menu
-
 if st.session_state["last_menu"] != menu:
-    st.session_state["show_modal"] = False
     st.session_state["last_menu"] = menu
 
-
-# --- Global state for modal ---
-if "show_modal" not in st.session_state:
-    st.session_state["show_modal"] = False
-if "employees" not in st.session_state:
-    st.session_state["employees"] = []
-
-
-# --- Common See_Emp button (works in all pages) ---
-def handle_see_emp():
-    try:
-        conn = get_db_connection()
-        df = pd.read_sql_query("SELECT * FROM employees", conn)
-        conn.close()
-
-        if not df.empty:
-            st.session_state["employees"] = df.to_dict(orient="records")
-            st.session_state["show_modal"] = True
-            st.rerun()  # ✅ IMPORTANT
-
-        else:
-            st.info("No employees found.")
-
-    except Exception as e:
-        st.error(f"Error fetching employees: {e}")
-
-
-# --- Modal display (custom HTML/CSS modal) ---
-def show_employee_modal():
-    if st.session_state.get("show_modal", False):
-        employees = st.session_state.get("employees", [])
-
-        if employees:
-            if st.button("❌ Close Employee List", key="close_modal_btn"):
-                st.session_state["show_modal"] = False
-                st.session_state["employees"] = []
-                st.rerun()
-
-            render_employee_modal(employees)
 
 def mark_attendance_db(
     emp_id,
@@ -369,16 +263,41 @@ def add_employee_db(name, department, doj, uid):
     except Exception as e:
         return str(e)    
 
-# ------------------- ADD EMPLOYEE PAGEs -------------------
-if menu == "Add Employee":
+# ------------------- HOME PAGEs -------------------
+
+if menu == "Home":
+    image_path = Path("assets/gurudwara_bg.png")
+    encoded_image = get_base64_image(image_path)
+
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: linear-gradient(rgba(255,255,255,0.12), rgba(255,255,255,0.12)), url("data:image/png;base64,{encoded_image}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+
+        .home-spacer {{
+            min-height: 80vh;
+        }}
+        </style>
+
+        <div class="home-spacer"></div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# ------------------- Add Employee PAGE -------------------
+
+elif menu == "Add Member":
     st.subheader("➕ Add New Member")
     st.markdown("Fields marked with * are required")
 
-    # Name
     st.markdown("Name <span style='color:red'>*</span>", unsafe_allow_html=True)
     name = st.text_input("", key="name")
 
-    # Department
     st.markdown("Department <span style='color:red'>*</span>", unsafe_allow_html=True)
     department = st.selectbox(
         "",
@@ -397,79 +316,29 @@ if menu == "Add Employee":
     if department == "Other":
         department = st.text_input("Enter Department", key="department_other")
 
-    # Date of Joining
     st.markdown(
         "Date of Joining <span style='color:red'>*</span>", unsafe_allow_html=True
     )
     doj = st.date_input("", key="doj")
 
-    # UID
     st.markdown("UID <span style='color:red'>*</span>", unsafe_allow_html=True)
     uid = st.text_input("", key="uid")
 
-    
-    if st.button("Add Employee", key="add_employee_btn_main"):
+    if st.button("Add Member", key="add_employee_btn_main"):
         if not name or not department or not doj or not uid:
             st.warning("Please fill all required fields.")
-
         else:
             result = add_employee_db(name, department, doj, uid)
 
             if result == "duplicate":
                 st.error("UID already exists. Please use a unique UID.")
-
             elif result == "success":
-                st.success("Employee added successfully!")
+                st.success("Member added successfully!")
                 st.cache_data.clear()
-
             else:
                 st.error(f"Error: {result}")
-
-    # added delete employee section in add employee page to avoid creating a separate page for it
-    # 🗑️ Delete Employee Section
-    st.divider()
-    st.subheader("🗑️ Delete Employee")
-
-    df_emp = get_employees()
-
-    if df_emp.empty:
-        st.info("No employees available to delete.")
-
-    else:
-        emp_options = {
-    f"{row['name']} (UID: {row['uid']})": row["id"]
-    for _, row in df_emp.iterrows()
-    }
-        
-        
-        selected_emp_del = st.selectbox(
-            "Select Employee to Delete", list(emp_options.keys()), key="delete_emp"
-        )
-
-        confirm_delete = st.checkbox("Confirm delete", key="confirm_emp_delete")
-
-        if st.button(
-            "Delete Employee", key="delete_emp_btn", disabled=not confirm_delete
-        ):
-            emp_id_del = emp_options[selected_emp_del]
-
-            try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-
-                cursor.execute("DELETE FROM employees WHERE id=%s", (emp_id_del,))
-                conn.commit()
-                conn.close()
-
-                st.success("Employee deleted successfully!")
-
-                # ✅ Refresh cache + UI
-                st.cache_data.clear()
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Error deleting employee: {e}")
-
+                
+    
 # ------------------- MARK ATTENDANCE PAGE -------------------
 elif menu == "Mark Attendance":
     st.subheader("🕒 Mark Attendance")
@@ -485,7 +354,7 @@ elif menu == "Mark Attendance":
     
     # ✅ Dropdown
 
-    selected_emp = st.selectbox("Select Employee", list(emp_options.keys()))
+    selected_emp = st.selectbox("Select Member", list(emp_options.keys()))
     emp_id = emp_options[selected_emp]
     emp_name = selected_emp.split(" (UID")[0]
 
@@ -546,7 +415,7 @@ elif menu == "Mark Attendance":
                 st.error("To Time must be after From Time.")
 
     if emp_id > 0 and not emp_name:
-        st.error("Employee not found!")
+        st.error("Member not found!")
 
     is_valid_employee = emp_id > 0 and emp_name != ""
     is_valid_event_member = selected_event_member == "N/A" or (
@@ -597,9 +466,7 @@ elif menu == "Mark Attendance":
             st.error(f"Error: {result}")
 
     st.divider()
-    if st.button("🧾 See_Emp", key="see_emp_mark"):
-        handle_see_emp()
-
+    
 
 # ------------------- VIEW ATTENDANCE PAGE -------------------
 elif menu == "View Attendance":
@@ -611,6 +478,7 @@ elif menu == "View Attendance":
 
     start_date = st.date_input("Start Date", default_start)
     end_date = st.date_input("End Date", default_end)
+    member_search = st.text_input("Search Member Name (Regular/Event)").strip()
 
     try:
         conn = get_db_connection()
@@ -625,7 +493,7 @@ elif menu == "View Attendance":
             a.marked_time AS "Timestamp"
         FROM attendance a
         LEFT JOIN employees e ON a.emp_id = e.id
-        WHERE date(a.marked_time) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE a.date BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY a.marked_time DESC
         LIMIT 500
         """
@@ -643,13 +511,21 @@ elif menu == "View Attendance":
             ea.marked_time AS "Timestamp"
         FROM event_attendance ea
         LEFT JOIN employees e ON ea.event_member_id = e.id
-        WHERE date(ea.marked_time) BETWEEN '{start_date}' AND '{end_date}'
+        WHERE ea.date BETWEEN '{start_date}' AND '{end_date}'
         ORDER BY ea.marked_time DESC
         LIMIT 500
         """
         event_df = pd.read_sql(event_query, conn)
 
         conn.close()
+
+        if member_search:
+            df = df[df["EName"].str.contains(member_search, case=False, na=False)]
+
+        if member_search:
+            event_df = event_df[
+                event_df["Event Member"].str.contains(member_search, case=False, na=False)
+            ]
 
         records = df.to_dict(orient="records")
         event_records = event_df.to_dict(orient="records")
@@ -786,39 +662,153 @@ elif menu == "View Attendance":
     else:
         st.info("No event member records available to delete.")
         
-        from utils import generate_summary, plot_summary_chart
         
-        
-        # 📊 Summary
-        normal_summary_df = generate_summary(records, "Status")
-        st.write("### Regular Attendance Summary")
-        st.dataframe(normal_summary_df)
-
-        if not normal_summary_df.empty:
-            normal_chart_path = plot_summary_chart(normal_summary_df)
-            st.image(normal_chart_path)
-
-        event_summary_df = generate_summary(records, "Event Status")
-        st.write("### Event Attendance Summary")
-        st.dataframe(event_summary_df)
-
-        if not event_summary_df.empty:
-            event_chart_path = plot_summary_chart(event_summary_df)
-            st.image(event_chart_path)
-
-        csv = df.to_csv(index=False).encode("utf-8")
-
-        st.download_button(
-            "⬇️ Download CSV Report",
-            csv,
-            file_name="attendance_report.csv",
-            mime="text/csv",
-        )
-
     st.divider()
-    if st.button("🧾 See_Emp", key="see_emp_view"):
-        handle_see_emp()
+    
+    
+# ------------------- Analytics PAGE -------------------    
+    
+elif menu == "Analytics":
+    st.subheader("📊 Attendance Analytics")
 
-    # Close the modal when JS sends the event
-# --- ALWAYS render modal (important) ---
-show_employee_modal()
+    today = date.today()
+    default_start = today.replace(day=1)
+    default_end = today
+
+    start_date = st.date_input("Analytics Start Date", default_start, key="analytics_start")
+    end_date = st.date_input("Analytics End Date", default_end, key="analytics_end")
+
+    try:
+        conn = get_db_connection()
+
+        regular_query = f"""
+        SELECT
+            a.id,
+            e.uid AS "UID",
+            a.marked_by AS "EName",
+            a.status AS "Status",
+            a.date,
+            a.marked_time AS "Timestamp"
+        FROM attendance a
+        LEFT JOIN employees e ON a.emp_id = e.id
+        WHERE a.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY a.marked_time DESC
+        LIMIT 500
+        """
+        df = pd.read_sql(regular_query, conn)
+
+        event_query = f"""
+        SELECT
+            ea.id,
+            e.uid AS "UID",
+            ea.event_member_name AS "Event Member",
+            ea.event_status AS "Event Status",
+            ea.event_from_time AS "Event From",
+            ea.event_to_time AS "Event To",
+            ea.date,
+            ea.marked_time AS "Timestamp"
+        FROM event_attendance ea
+        LEFT JOIN employees e ON ea.event_member_id = e.id
+        WHERE ea.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY ea.marked_time DESC
+        LIMIT 500
+        """
+        event_df = pd.read_sql(event_query, conn)
+
+        conn.close()
+
+        records = df.to_dict(orient="records")
+        event_records = event_df.to_dict(orient="records")
+
+    except Exception as e:
+        st.error(f"Error fetching analytics data: {e}")
+        records = []
+        event_records = []
+
+    from utils import generate_summary, plot_summary_chart
+
+    normal_summary_df = generate_summary(records, "Status")
+    st.write("### Regular Attendance Summary")
+    st.dataframe(normal_summary_df)
+
+    if not normal_summary_df.empty:
+        normal_chart_path = plot_summary_chart(
+            normal_summary_df, "Status", "regular_attendance_chart.png"
+        )
+        st.image(normal_chart_path)
+
+    event_summary_df = generate_summary(event_records, "Event Status")
+    st.write("### Event Attendance Summary")
+    st.dataframe(event_summary_df)
+
+    if not event_summary_df.empty:
+        event_chart_path = plot_summary_chart(
+            event_summary_df, "Event Status", "event_attendance_chart.png"
+        )
+        st.image(event_chart_path)
+        
+        
+        
+# ------------------- Member List PAGE ------------------- 
+elif menu == "Member List":
+    st.subheader("📋 Member List")
+
+    try:
+        conn = get_db_connection()
+        df_emp_list = pd.read_sql_query(
+            "SELECT id, name, uid, department, doj FROM employees ORDER BY name ASC",
+            conn,
+        )
+        conn.close()
+
+        if df_emp_list.empty:
+            st.info("No members found.")
+        else:
+            st.dataframe(df_emp_list, use_container_width=True)
+
+            st.divider()
+            st.subheader("🗑️ Delete Member")
+
+            emp_options = {
+                f"{row['name']} (UID: {row['uid']})": row["id"]
+                for _, row in df_emp_list.iterrows()
+            }
+
+            selected_emp_del = st.selectbox(
+                "Select Member to Delete",
+                list(emp_options.keys()),
+                key="delete_emp_from_list",
+            )
+
+            if st.session_state.pop("reset_emp_delete_from_list", False):
+                st.session_state["confirm_emp_delete_from_list"] = False
+
+            confirm_delete = st.checkbox(
+                "Confirm delete", key="confirm_emp_delete_from_list"
+            )
+
+            if st.button(
+                "Delete Member",
+                key="delete_emp_btn_from_list",
+                disabled=not confirm_delete,
+            ):
+                emp_id_del = emp_options[selected_emp_del]
+
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+
+                    cursor.execute("DELETE FROM employees WHERE id=%s", (emp_id_del,))
+                    conn.commit()
+                    conn.close()
+
+                    st.success("Member deleted successfully!")
+                    st.cache_data.clear()
+                    st.session_state["reset_emp_delete_from_list"] = True
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error deleting Member: {e}")
+
+    except Exception as e:
+        st.error(f"Error fetching Member list: {e}")
