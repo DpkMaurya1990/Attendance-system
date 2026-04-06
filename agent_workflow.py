@@ -50,20 +50,10 @@ def parse_attendance_date(value):
     if normalized is None:
         return None
 
-    supported_formats = (
-        "%Y-%m-%d",
-        "%d-%m-%Y",
-        "%d/%m/%Y",
-        "%Y/%m/%d",
-    )
-
-    for fmt in supported_formats:
-        try:
-            return datetime.strptime(normalized, fmt).date().isoformat()
-        except ValueError:
-            continue
-
-    return None
+    try:
+        return datetime.strptime(normalized, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return None
 
     try:
         return pd.to_datetime(normalized).date().isoformat()

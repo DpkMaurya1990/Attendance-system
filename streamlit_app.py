@@ -874,11 +874,13 @@ elif menu == "View Attendance":
         conn.close()
 
         if member_search:
-            df = df[df["EName"].str.contains(member_search, case=False, na=False)]
+            df = df[
+                df["Member Name"].str.contains(member_search, case=False, na=False)
+            ]
 
         if member_search:
             event_df = event_df[
-                event_df["Event Member"].str.contains(member_search, case=False, na=False)
+                event_df["Member Name"].str.contains(member_search, case=False, na=False)
             ]
 
         records = df.to_dict(orient="records")
@@ -1172,6 +1174,8 @@ elif menu == "Member List":
 # ------------------- Sync Attendance PAGE -------------------
 elif menu == "Sync Attendance":
     st.subheader("Upload Attendance CSV Files")
+    
+    st.info("For CSV sync, use Date in YYYY-MM-DD format only. Example: 2026-04-06")
     
     st.caption(
         "Upload one or both attendance CSV files, review the cleaned output and sync report, then sync only the clean rows."
