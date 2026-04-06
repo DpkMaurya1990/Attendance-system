@@ -197,7 +197,7 @@ def ensure_performance_indexes():
         conn.close()
     except Exception as e:
         st.error(f"Error creating performance indexes: {e}")       
-        
+@st.cache_data        
 def get_base64_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode()    
@@ -214,9 +214,7 @@ menu = st.sidebar.radio(
 if menu != "Home":
     st.title("🧑‍💼 Attendance System 🚀 DEV")
     
-ensure_member_code_column()  
-backfill_member_codes()  
-    
+
 # Reset modal when page changes
 if "last_menu" not in st.session_state:
     st.session_state["last_menu"] = menu
@@ -319,6 +317,8 @@ def add_employee_db(name, department, doj, uid):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        ensure_member_code_column()
 
         # ✅ Duplicate check
         cursor.execute(
@@ -1195,6 +1195,14 @@ elif menu == "Sync Attendance":
 
     required_regular_columns = REGULAR_REQUIRED_COLUMNS
     required_event_columns = EVENT_REQUIRED_COLUMNS
+    
+    if (
+        "prepared_sync_payload" in st.session_state
+        and regular_csv is None
+        and event_csv is None
+    ):
+        st.session_state.pop("prepared_sync_payload", None)
+        
     
     current_upload_signature = (
         regular_csv.name if regular_csv else None,
