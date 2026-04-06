@@ -12,6 +12,14 @@ import sqlite3
 import pandas as pd
 import psycopg2
 
+from agent_workflow import (
+    EVENT_REQUIRED_COLUMNS,
+    REGULAR_REQUIRED_COLUMNS,
+    format_event_time,
+    prepare_agent_sync_payload,
+    prepare_uploaded_dataframe,
+)
+
 TIME_OPTIONS = [
     datetime.strptime(f"{hour:02d}:{minute:02d}", "%H:%M").strftime("%I:%M %p")
     for hour in range(24)
@@ -48,11 +56,11 @@ def ensure_attendance_schema():
 def get_employees():
     try:
         conn = get_db_connection()
-        df = pd.read_sql("SELECT id, name, uid FROM employees", conn)
+        df = pd.read_sql("SELECT id, member_code, name, uid FROM employees", conn)
         conn.close()
         return df
     except Exception as e:
-        return pd.DataFrame(columns=["id", "name", "uid"])
+        return pd.DataFrame(columns=["id", "member_code", "name", "uid"])
 
 # Backend API base URL
 API_URL = "http://127.0.0.1:8000"
@@ -67,6 +75,78 @@ def get_db_connection():
         port="6543",
         connect_timeout=10,
     )
+    
+def ensure_member_code_column():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS member_code TEXT"
+        )
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error creating member_code column: {e}")
+        
+def generate_next_member_code(cursor):
+    cursor.execute(
+        """
+        SELECT member_code
+        FROM employees
+        WHERE member_code IS NOT NULL
+        AND member_code LIKE 'GM-%'
+        ORDER BY member_code DESC
+        LIMIT 1
+        """
+    )
+
+    row = cursor.fetchone()
+
+    if not row or not row[0]:
+        return "GM-0001"
+
+    last_code = row[0]
+    last_number = int(last_code.split("-")[1])
+    next_number = last_number + 1
+
+    return f"GM-{next_number:04d}"
+
+def backfill_member_codes():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM employees
+            WHERE member_code IS NULL OR TRIM(member_code) = ''
+            ORDER BY id ASC
+            """
+        )
+
+        rows = cursor.fetchall()
+
+        for row in rows:
+            member_id = row[0]
+            next_code = generate_next_member_code(cursor)
+
+            cursor.execute(
+                """
+                UPDATE employees
+                SET member_code = %s
+                WHERE id = %s
+                """,
+                (next_code, member_id),
+            )
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Error backfilling member_code: {e}")
+            
 
 def ensure_event_attendance_table():
     try:
@@ -128,11 +208,14 @@ st.set_page_config(page_title="Attendance System", layout="centered")
 # Sidebar menu
 menu = st.sidebar.radio(
     "Menu",
-    ["Home", "Add Member", "Mark Attendance", "View Attendance", "Analytics", "Member List"],
+    ["Home", "Add Member", "Mark Attendance", "View Attendance", "Analytics", "Member List", "Sync Attendance"],
 )
 
 if menu != "Home":
     st.title("🧑‍💼 Attendance System 🚀 DEV")
+    
+ensure_member_code_column()  
+backfill_member_codes()  
     
 # Reset modal when page changes
 if "last_menu" not in st.session_state:
@@ -245,14 +328,16 @@ def add_employee_db(name, department, doj, uid):
         if cursor.fetchone():
             conn.close()
             return "duplicate"
-
+        
+        member_code = generate_next_member_code(cursor)
+        
         # ✅ Insert
         cursor.execute(
             """
-            INSERT INTO employees (name, department, doj, uid)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO employees (name, department, doj, uid, member_code)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (name, department, str(doj), uid),
+            (name, department, str(doj), uid, member_code),
         )
 
         conn.commit()
@@ -262,6 +347,275 @@ def add_employee_db(name, department, doj, uid):
 
     except Exception as e:
         return str(e)    
+
+#-------------------- Sync Regular Attendance -------------------
+def sync_regular_attendance_csv(regular_df):
+    inserted_count = 0
+    duplicate_count = 0
+    missing_member_count = 0
+    invalid_status_count = 0
+    error_rows = []
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        for idx, row in regular_df.iterrows():
+            member_code = str(row.get("Member Code", "")).strip()
+            status = str(row.get("Status", "")).strip().title()
+            attendance_date = str(row.get("Date", "")).strip()
+
+            if status not in ["Present", "Absent"]:
+                invalid_status_count += 1
+                error_rows.append(
+                    {
+                        "Row Number": idx + 2,
+                        "Member Code": member_code,
+                        "Reason": "Invalid status",
+                    }
+                )
+                continue
+
+            cursor.execute(
+                """
+                SELECT id, name
+                FROM employees
+                WHERE member_code = %s
+                """,
+                (member_code,),
+            )
+            member_row = cursor.fetchone()
+
+            if not member_row:
+                missing_member_count += 1
+                error_rows.append(
+                    {
+                        "Row Number": idx + 2,
+                        "Member Code": member_code,
+                        "Reason": "Member code not found",
+                    }
+                )
+                continue
+
+            member_id, member_name = member_row
+
+            cursor.execute(
+                """
+                SELECT 1
+                FROM attendance
+                WHERE emp_id = %s AND date = %s
+                """,
+                (member_id, attendance_date),
+            )
+
+            if cursor.fetchone():
+                duplicate_count += 1
+                error_rows.append(
+                    {
+                        "Row Number": idx + 2,
+                        "Member Code": member_code,
+                        "Reason": "Duplicate regular attendance",
+                    }
+                )
+                continue
+
+            current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            cursor.execute(
+                """
+                INSERT INTO attendance (emp_id, status, marked_by, date, marked_time)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (member_id, status, member_name, attendance_date, current_timestamp),
+            )
+
+            inserted_count += 1
+
+        conn.commit()
+        conn.close()
+
+        return {
+            "inserted": inserted_count,
+            "duplicates": duplicate_count,
+            "missing_members": missing_member_count,
+            "invalid_status": invalid_status_count,
+            "error_rows": error_rows,
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+#-------------------- Sync Event Attendance -------------------
+
+def format_event_time(value):
+    time_str = str(value).strip()
+
+    if not time_str or time_str.lower() == "nan":
+        return None
+
+    # If datetime-like value comes from CSV, keep only time part
+    if " " in time_str and ":" in time_str:
+        possible_time = time_str.split()[-1]
+        if ":" in possible_time:
+            time_str = possible_time
+
+    # Remove fractional seconds if present, e.g. 13:00:00.000000
+    if "." in time_str:
+        time_str = time_str.split(".")[0]
+
+    supported_formats = (
+        "%H:%M:%S",
+        "%H:%M",
+        "%I:%M %p",
+        "%I:%M:%S %p",
+    )
+
+    for fmt in supported_formats:
+        try:
+            return datetime.strptime(time_str, fmt).strftime("%I:%M %p")
+        except ValueError:
+            continue
+
+    return None
+
+
+def sync_event_attendance_csv(event_df):
+    inserted_count = 0
+    duplicate_count = 0
+    missing_member_count = 0
+    invalid_status_count = 0
+    invalid_time_count = 0
+    error_rows = []
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        for idx, row in event_df.iterrows():
+            member_code = str(row.get("Member Code", "")).strip()
+            event_status = str(row.get("Event Status", "")).strip().title()
+            attendance_date = str(row.get("Date", "")).strip()
+
+            if event_status not in ["Present", "Absent"]:
+                invalid_status_count += 1
+                error_rows.append(
+                    {
+                        "Row Number": idx + 2,
+                        "Member Code": member_code,
+                        "Reason": "Invalid event status",
+                    }
+                )
+                continue
+
+            cursor.execute(
+                """
+                SELECT id, name
+                FROM employees
+                WHERE member_code = %s
+                """,
+                (member_code,),
+            )
+            member_row = cursor.fetchone()
+
+            if not member_row:
+                missing_member_count += 1
+                error_rows.append(
+                    {
+                        "Row Number": idx + 2,
+                        "Member Code": member_code,
+                        "Reason": "Member code not found",
+                    }
+                )
+                continue
+
+            member_id, member_name = member_row
+
+            cursor.execute(
+                """
+                SELECT 1
+                FROM event_attendance
+                WHERE event_member_id = %s AND date = %s
+                """,
+                (member_id, attendance_date),
+            )
+
+            if cursor.fetchone():
+                duplicate_count += 1
+                error_rows.append(
+                    {
+                        "Row Number": idx + 2,
+                        "Member Code": member_code,
+                        "Reason": "Duplicate event attendance",
+                    }
+                )
+                continue
+
+            from_time = None
+            to_time = None
+
+            if event_status == "Present":
+                from_time = format_event_time(row.get("From Time", ""))
+                to_time = format_event_time(row.get("To Time", ""))
+
+                if not from_time or not to_time:
+                    invalid_time_count += 1
+                    error_rows.append(
+                        {
+                            "Row Number": idx + 2,
+                            "Member Code": member_code,
+                            "Raw From Time": str(row.get("From Time", "")),
+                            "Raw To Time": str(row.get("To Time", "")),
+                            "Reason": "Invalid or missing event time",
+                        }
+                    )
+                    continue
+
+            current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            cursor.execute(
+                """
+                INSERT INTO event_attendance
+                (
+                    attendance_id,
+                    event_member_id,
+                    event_member_name,
+                    event_status,
+                    event_from_time,
+                    event_to_time,
+                    date,
+                    marked_time
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    None,
+                    member_id,
+                    member_name,
+                    event_status,
+                    from_time,
+                    to_time,
+                    attendance_date,
+                    current_timestamp,
+                ),
+            )
+
+            inserted_count += 1
+
+        conn.commit()
+        conn.close()
+
+        return {
+            "inserted": inserted_count,
+            "duplicates": duplicate_count,
+            "missing_members": missing_member_count,
+            "invalid_status": invalid_status_count,
+            "invalid_time": invalid_time_count,
+            "error_rows": error_rows,
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
 
 # ------------------- HOME PAGEs -------------------
 
@@ -347,16 +701,16 @@ elif menu == "Mark Attendance":
     df_emp = get_employees()
 
     emp_options = {
-    f"{row['name']} (UID: {row['uid']})": row["id"]
-    for _, row in df_emp.iterrows()
-}
+        f"{row['member_code']} | {row['name']} (UID: {row['uid']})": row["id"]
+        for _, row in df_emp.iterrows()
+    }
     
     
     # ✅ Dropdown
 
     selected_emp = st.selectbox("Select Member", list(emp_options.keys()))
     emp_id = emp_options[selected_emp]
-    emp_name = selected_emp.split(" (UID")[0]
+    emp_name = selected_emp.split(" | ", 1)[1].split(" (UID")[0]
 
     status = st.selectbox("Status", ["Present", "Absent"])
 
@@ -389,7 +743,7 @@ elif menu == "Mark Attendance":
 
     else:
         event_member_id = emp_options[selected_event_member]
-        event_member_name = selected_event_member.split(" (UID")[0]
+        event_member_name = selected_event_member.split(" | ", 1)[1].split(" (UID")[0]
 
         event_status = st.selectbox(
             "Event Status", ["Present", "Absent"], key="event_status"
@@ -486,8 +840,8 @@ elif menu == "View Attendance":
         regular_query = f"""
         SELECT
             a.id,
-            e.uid AS "UID",
-            a.marked_by AS "EName",
+            e.member_code AS "Member Code",
+            a.marked_by AS "Member Name",
             a.status AS "Status",
             a.date,
             a.marked_time AS "Timestamp"
@@ -502,8 +856,8 @@ elif menu == "View Attendance":
         event_query = f"""
         SELECT
             ea.id,
-            e.uid AS "UID",
-            ea.event_member_name AS "Event Member",
+            e.member_code AS "Member Code",
+            ea.event_member_name AS "Member Name",
             ea.event_status AS "Event Status",
             ea.event_from_time AS "Event From",
             ea.event_to_time AS "Event To",
@@ -562,7 +916,7 @@ elif menu == "View Attendance":
     if not df_display.empty:
 
         record_options = {
-            f"{row.get('EName', '')} | {row.get('Status', row.get('status', ''))} | {row.get('Timestamp', '')}": row[
+            f"{row.get('Member Code', '')} | {row.get('Member Name', row.get('EName', ''))} | {row.get('Status', row.get('status', ''))} | {row.get('Timestamp', '')}": row[
                 "id"
             ]
             for _, row in df_display.iterrows()
@@ -611,7 +965,7 @@ elif menu == "View Attendance":
     st.subheader("Delete Event Member Record")
 
     event_record_options = {
-        f"{row.get('Event Member', '')} | {row.get('Event Status', '')} | {row.get('Timestamp', '')}": row["id"]
+        f"{row.get('Member Code', '')} | {row.get('Member Name', row.get('Event Member', ''))} | {row.get('Event Status', '')} | {row.get('Timestamp', '')}": row["id"]
         for _, row in event_df_display.iterrows()
     }
 
@@ -756,7 +1110,7 @@ elif menu == "Member List":
     try:
         conn = get_db_connection()
         df_emp_list = pd.read_sql_query(
-            "SELECT id, name, uid, department, doj FROM employees ORDER BY name ASC",
+            "SELECT id, member_code, name, uid, department, doj FROM employees ORDER BY name ASC",
             conn,
         )
         conn.close()
@@ -770,7 +1124,7 @@ elif menu == "Member List":
             st.subheader("🗑️ Delete Member")
 
             emp_options = {
-                f"{row['name']} (UID: {row['uid']})": row["id"]
+                f"{row['member_code']} | {row['name']} (UID: {row['uid']})": row["id"]
                 for _, row in df_emp_list.iterrows()
             }
 
@@ -812,3 +1166,326 @@ elif menu == "Member List":
 
     except Exception as e:
         st.error(f"Error fetching Member list: {e}")
+        
+        
+        
+# ------------------- Sync Attendance PAGE -------------------
+elif menu == "Sync Attendance":
+    st.subheader("Upload Attendance CSV Files")
+    
+    st.caption(
+        "Upload one or both attendance CSV files, review the cleaned output and sync report, then sync only the clean rows."
+    )
+
+    regular_csv = st.file_uploader(
+        "Upload Regular Attendance CSV",
+        type=["csv"],
+        key="regular_attendance_csv",
+    )
+
+    event_csv = st.file_uploader(
+        "Upload Event Attendance CSV",
+        type=["csv"],
+        key="event_attendance_csv",
+    )
+
+    required_regular_columns = REGULAR_REQUIRED_COLUMNS
+    required_event_columns = EVENT_REQUIRED_COLUMNS
+    
+    current_upload_signature = (
+        regular_csv.name if regular_csv else None,
+        regular_csv.size if regular_csv else None,
+        event_csv.name if event_csv else None,
+        event_csv.size if event_csv else None,
+    )
+
+    if st.session_state.get("agent_upload_signature") != current_upload_signature:
+        st.session_state["agent_upload_signature"] = current_upload_signature
+        st.session_state.pop("prepared_sync_payload", None)
+        
+        
+
+    regular_preview_df = None
+    event_preview_df = None
+    regular_valid = False
+    event_valid = False
+    prepared_sync_payload = None
+    can_prepare_regular_agent_file = False
+
+    if regular_csv is not None:
+        try:
+            regular_preview_df = prepare_uploaded_dataframe(pd.read_csv(regular_csv))
+            regular_preview_df.columns = regular_preview_df.columns.str.strip()
+            st.write("### Regular Attendance Preview")
+            st.dataframe(
+                regular_preview_df.drop(columns=["_source_row_number"], errors="ignore"),
+                use_container_width=True,
+            )
+
+            missing_regular_columns = required_regular_columns - set(regular_preview_df.columns)
+            if missing_regular_columns:
+                st.error(
+                    f"Regular Attendance CSV is missing columns: {', '.join(sorted(missing_regular_columns))}"
+                )
+            else:
+                regular_valid = True
+                st.success("Regular Attendance CSV format looks valid.")
+
+        except Exception as e:
+            st.error(f"Error reading regular attendance CSV: {e}")
+            
+    
+    if event_csv is not None:
+        try:
+            event_preview_df = prepare_uploaded_dataframe(pd.read_csv(event_csv))
+            event_preview_df.columns = event_preview_df.columns.str.strip()
+            st.write("### Event Attendance Preview")
+            st.dataframe(
+                event_preview_df.drop(columns=["_source_row_number"], errors="ignore"),
+                use_container_width=True,
+            )
+
+            missing_event_columns = required_event_columns - set(event_preview_df.columns)
+            if missing_event_columns:
+                st.error(
+                    f"Event Attendance CSV is missing columns: {', '.join(sorted(missing_event_columns))}"
+                )
+            else:
+                event_valid = True
+                st.success("Event Attendance CSV format looks valid.")
+
+                event_validation_issues = []
+
+                for idx, row in event_preview_df.iterrows():
+                    event_status = str(row.get("Event Status", "")).strip().title()
+                    from_time_raw = str(row.get("From Time", "")).strip()
+                    to_time_raw = str(row.get("To Time", "")).strip()
+                    member_code_raw = str(row.get("Member Code", "")).strip()
+
+                    if not member_code_raw or member_code_raw.lower() == "nan":
+                        event_validation_issues.append(
+                            {
+                                "Row Number": idx + 2,
+                                "Member Code": member_code_raw,
+                                "Reason": "Missing Member Code",
+                            }
+                        )
+
+                    if event_status not in ["Present", "Absent"]:
+                        event_validation_issues.append(
+                            {
+                                "Row Number": idx + 2,
+                                "Member Code": member_code_raw,
+                                "Reason": "Invalid Event Status",
+                            }
+                        )
+
+                    if event_status == "Present":
+                        if not from_time_raw or from_time_raw.lower() == "nan":
+                            event_validation_issues.append(
+                                {
+                                    "Row Number": idx + 2,
+                                    "Member Code": member_code_raw,
+                                    "Reason": "Missing From Time",
+                                }
+                            )
+                        elif ":" not in from_time_raw or format_event_time(from_time_raw) is None:
+                            event_validation_issues.append(
+                                {
+                                    "Row Number": idx + 2,
+                                    "Member Code": member_code_raw,
+                                    "Reason": "Invalid From Time format",
+                                }
+                            )
+
+                        if not to_time_raw or to_time_raw.lower() == "nan":
+                            event_validation_issues.append(
+                                {
+                                    "Row Number": idx + 2,
+                                    "Member Code": member_code_raw,
+                                    "Reason": "Missing To Time",
+                                }
+                            )
+                        elif ":" not in to_time_raw or format_event_time(to_time_raw) is None:
+                            event_validation_issues.append(
+                                {
+                                    "Row Number": idx + 2,
+                                    "Member Code": member_code_raw,
+                                    "Reason": "Invalid To Time format",
+                                }
+                            )
+
+                if event_validation_issues:
+                    st.warning("Event Attendance CSV has row-level validation issues.")
+                    st.dataframe(pd.DataFrame(event_validation_issues), use_container_width=True)
+                else:
+                    st.success("Event Attendance CSV row-level validation looks good.")
+
+        except Exception as e:
+            st.error(f"Error reading event attendance CSV: {e}")
+            
+            
+    can_prepare_regular_agent_file = (
+        regular_preview_df is not None or event_preview_df is not None
+    )
+
+    if st.button(
+        "Review and Prepare Clean CSVs",
+        key="prepare_clean_regular_csv_btn",
+        disabled=not can_prepare_regular_agent_file,
+    ):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            prepared_sync_payload = prepare_agent_sync_payload(
+                regular_preview_df,
+                event_preview_df,
+                cursor,
+            )
+
+            conn.close()
+            st.session_state["prepared_sync_payload"] = prepared_sync_payload
+
+        except Exception as e:
+            st.error(f"Could not prepare the uploaded CSV files: {e}")
+
+    if "prepared_sync_payload" in st.session_state:
+        prepared_sync_payload = st.session_state["prepared_sync_payload"]
+
+    if prepared_sync_payload is not None:
+        show_regular_sections = regular_preview_df is not None
+        show_event_sections = event_preview_df is not None
+        if show_regular_sections:
+            st.write("### Regular Attendance Summary")
+
+            regular_summary = prepared_sync_payload["regular_summary"]
+
+            summary_df = pd.DataFrame(
+                [
+                    {
+                        "Source File": "Regular_Attendance",
+                        "Accepted Rows": regular_summary["accepted"],
+                        "Warnings": regular_summary["warnings"],
+                        "Rejected Rows": regular_summary["rejected"],
+                    }
+                ]
+            )
+            st.dataframe(summary_df, use_container_width=True)
+        
+        
+        if show_event_sections:
+            event_summary = prepared_sync_payload["event_summary"]
+
+            event_summary_df = pd.DataFrame(
+                [
+                    {
+                        "Source File": "Event_Attendance",
+                        "Accepted Rows": event_summary["accepted"],
+                        "Warnings": event_summary["warnings"],
+                        "Rejected Rows": event_summary["rejected"],
+                    }
+                ]
+            )
+            st.write("### Event Attendance Summary")
+            st.dataframe(event_summary_df, use_container_width=True)
+        
+
+        if show_regular_sections:
+            st.write("### Ready to Sync: Regular Attendance")
+            if prepared_sync_payload["regular_clean_df"].empty:
+                st.info("No clean regular attendance rows are ready yet.")
+            else:
+                st.dataframe(
+                    prepared_sync_payload["regular_clean_df"],
+                    use_container_width=True,
+                )
+
+        if show_event_sections:
+            st.write("### Ready to Sync: Event Attendance")
+            if prepared_sync_payload["event_clean_df"].empty:
+                st.info("No clean event attendance rows are ready yet.")
+            else:
+                st.dataframe(
+                    prepared_sync_payload["event_clean_df"],
+                    use_container_width=True,
+                )
+
+
+        report_title = "### Agent Sync Report"
+
+        if show_regular_sections and not show_event_sections:
+            report_title = "### Regular Attendance Agent Report"
+        elif show_event_sections and not show_regular_sections:
+            report_title = "### Event Attendance Agent Report"
+
+        st.write(report_title)
+
+        if prepared_sync_payload["report_df"].empty:
+            st.success("No sync issues found in the prepared data.")
+        else:
+            st.dataframe(
+                prepared_sync_payload["report_df"],
+                use_container_width=True,
+            )        
+            
+            
+
+    if st.button(
+        "Sync Attendance",
+        key="sync_attendance_btn",
+        disabled=not (
+            prepared_sync_payload is not None
+            and (
+                not prepared_sync_payload["regular_clean_df"].empty
+                or not prepared_sync_payload["event_clean_df"].empty
+            )
+        ),
+    ):
+        regular_result = None
+        event_result = None
+
+        if not prepared_sync_payload["regular_clean_df"].empty:
+            regular_result = sync_regular_attendance_csv(
+                prepared_sync_payload["regular_clean_df"]
+            )
+
+        if not prepared_sync_payload["event_clean_df"].empty:
+            event_result = sync_event_attendance_csv(
+                prepared_sync_payload["event_clean_df"]
+            )
+
+        if regular_result is not None:
+            if "error" in regular_result:
+                st.error(f"Regular Attendance sync failed: {regular_result['error']}")
+            else:
+                st.success("Regular attendance clean rows synced successfully.")
+                st.write(f"Clean rows inserted: {regular_result['inserted']}")
+                st.write(f"Duplicate rows skipped: {regular_result['duplicates']}")
+                st.write(f"Rows skipped for missing member code: {regular_result['missing_members']}")
+                st.write(f"Rows skipped for invalid status: {regular_result['invalid_status']}")
+
+                if regular_result["error_rows"]:
+                    st.write("### Regular Sync Details")
+                    st.dataframe(
+                        pd.DataFrame(regular_result["error_rows"]),
+                        use_container_width=True,
+                    )
+
+        if event_result is not None:
+            if "error" in event_result:
+                st.error(f"Event Attendance sync failed: {event_result['error']}")
+            else:
+                st.success("Event attendance clean rows synced successfully.")
+                st.write(f"Clean rows inserted: {event_result['inserted']}")
+                st.write(f"Duplicate rows skipped: {event_result['duplicates']}")
+                st.write(f"Rows skipped for missing member code: {event_result['missing_members']}")
+                st.write(f"Rows skipped for invalid event status: {event_result['invalid_status']}")
+                st.write(f"Rows skipped for invalid event time: {event_result['invalid_time']}")
+
+                if event_result["error_rows"]:
+                    st.write("### Event Sync Details")
+                    st.dataframe(
+                        pd.DataFrame(event_result["error_rows"]),
+                        use_container_width=True,
+                    )
